@@ -707,6 +707,11 @@ function clearDragStyles() {
  *  放置逻辑
  * ============================================================ */
 function dropIntoFolder(ids, targetFolderId) {
+  if (sortState.key && currentFolder && !searchQuery) {
+    currentFolder.children = applySort(currentFolder.children.slice());
+    sortState = { key: null, dir: 1 };
+    renderList();
+  }
   const tgt = findById(targetFolderId);
   if (!tgt || tgt.node.type !== 'folder') return;
   const items = collectMovable(ids, tgt.node);
@@ -721,6 +726,11 @@ function dropIntoFolder(ids, targetFolderId) {
 }
 
 function dropSibling(ids, refNode, position) {
+  if (sortState.key && currentFolder && !searchQuery) {
+    currentFolder.children = applySort(currentFolder.children.slice());
+    sortState = { key: null, dir: 1 };
+    renderList();
+  }
   const r = findById(refNode.id);
   if (!r || !r.parent) return;
   const parent = r.parent;
@@ -1094,6 +1104,15 @@ function faviconUrl(url) {
 }
 
 function reorderMulti(ids, targetId, before) {
+  // === 新增：如果当前有列排序，先把真实顺序固化成显示顺序 ===
+  if (sortState.key && currentFolder && !searchQuery) {
+    const displayed = applySort(currentFolder.children.slice());
+    currentFolder.children = displayed;
+    sortState = { key: null, dir: 1 };
+    // 需要重渲一次，否则 row 的 data-id 索引和真实顺序对不上
+    renderList();
+  }
+  // === 新增结束 ===
   const tgt = findById(targetId);
   if (!tgt) return;
   const targetParent = tgt.parent || root;
