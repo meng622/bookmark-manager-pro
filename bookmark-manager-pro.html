@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.3.0</title>
-<!-- 书签管理器 Pro v1.3.0 | 2026-10-14 -->
+<title>书签管理器 Pro v1.3.1</title>
+<!-- 书签管理器 Pro v1.3.1 | 2026-10-14 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -70,7 +70,7 @@
   .tree-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--accent); }
   .tree-row .arrow { width: 14px; text-align: center; color: var(--muted); font-size: 10px; }
   .tree-row .icon { width: 16px; text-align: center; }
-  .tree-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+  .tree-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 2px; }
   .tree-row .count { color: var(--muted); font-size: 11px; }
   .tree-row.active .count { color: #ddd; }
   .tree-children { margin-left: 14px; }
@@ -86,6 +86,7 @@
     background: var(--panel2); border-bottom: 1px solid var(--border);
     font-size: 11px; color: var(--muted); user-select: none;
     position: sticky; top: 0; z-index: 5; height: 28px;
+    overflow: hidden;
   }
   .list-header .col {
     display: flex; align-items: center; gap: 3px; cursor: pointer;
@@ -111,7 +112,7 @@
   body.col-resizing { cursor: col-resize !important; }
   body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
 
-  .list { flex: 1; overflow-y: auto; padding: 6px; position: relative; }
+  .list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px; position: relative; }
   .list-item {
     display: flex; align-items: center; padding: 4px 0;
     border-radius: 5px; cursor: pointer; margin-bottom: 1px;
@@ -121,7 +122,9 @@
   .list-item.selected { background: var(--accent); color: #fff; }
   .list-item > span, .list-item > img { flex-shrink: 0; padding: 0 3px; }
   .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; margin: 0 3px; }
-  .list-item .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-item .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 2px; }
+  .list-item .title .title-icon { flex: 0 0 auto; }
+  .list-item .title .title-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item .url { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item.selected .url { color: #e0e0e0; }
   .list-item .status { text-align: center; font-size: 11px; border-radius: 8px; padding: 1px 6px; margin: 0 3px; }
@@ -131,13 +134,17 @@
   .status.pending { background: rgba(224,175,104,.2); color: var(--warn); }
   .list-item .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 3px; }
   .list-item.selected .tag { background: rgba(255,255,255,.2); color: #fff; }
-  .list-item .date { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .list-item.selected .date { color: #e0e0e0; }
-  /* 列表行 drop 视觉 */
   .list-item.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
   .list-item.drop-after  { box-shadow: inset 0 -2px 0 0 var(--accent); }
   .list-item.drop-into   { background: var(--accent2); color: #fff; }
   .dragging { opacity: .4; }
+
+  .inline-edit {
+    flex: 1; min-width: 0;
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--accent); border-radius: 3px;
+    padding: 1px 4px; font: inherit; outline: none;
+  }
 
   .marquee {
     position: fixed; border: 1px solid var(--accent);
@@ -173,7 +180,9 @@
     border: 1px solid var(--border); padding: 7px 9px; border-radius: 5px;
     font-size: 13px; font-family: inherit; outline: none;
   }
+  .modal input[type=checkbox] { width: auto; }
   .modal textarea { min-height: 100px; resize: vertical; }
+  .modal code { background: var(--bg); padding: 1px 5px; border-radius: 3px; color: var(--accent2); }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
   .log-box {
@@ -220,7 +229,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.3.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.3.1</span>
   </div>
 </div>
 
@@ -263,7 +272,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 /* ============================================================
  *  数据模型
@@ -273,16 +282,16 @@ let currentFolder = null;
 let selectedIds = new Set();
 let searchQuery = '';
 let uidCounter = 0;
+let editingId = null;   // 正在被 inline 编辑的节点 id
 const uid = () => 'n' + (++uidCounter) + '_' + Date.now().toString(36);
 
 let sortState = { key: null, dir: 1 };
 
 const DEFAULT_COLS = {
-  '__fav': 24,
-  'title': 260,
-  'url': 380,
-  'status': 64,
-  'date': 140,
+  '__fav': 22,
+  'title': 220,
+  'url': 340,
+  'status': 60,
   'tag': 110,
 };
 let colWidths = loadColWidths();
@@ -328,15 +337,18 @@ function parseDl(dl) {
     const a = child.querySelector(':scope > a');
     if (h3) {
       const folder = newFolder(cleanText(h3.textContent));
-      folder.addDate = parseInt(h3.getAttribute('ADD_DATE')) || Date.now();
-      folder.lastModified = parseInt(h3.getAttribute('LAST_MODIFIED')) || folder.addDate;
+      const ad = parseInt(h3.getAttribute('ADD_DATE'), 10);
+      folder.addDate = isNaN(ad) ? Date.now() : ad * 1000;
+      const lm = parseInt(h3.getAttribute('LAST_MODIFIED'), 10);
+      folder.lastModified = isNaN(lm) ? folder.addDate : lm * 1000;
       let next = child.nextElementSibling;
       let subDl = child.querySelector(':scope > dl') || (next && next.tagName === 'DL' ? next : null);
       if (subDl) folder.children = parseDl(subDl);
       items.push(folder);
     } else if (a) {
+      const ad = parseInt(a.getAttribute('ADD_DATE'), 10);
       items.push(newBookmark(cleanText(a.textContent), a.getAttribute('HREF') || '', {
-        addDate: parseInt(a.getAttribute('ADD_DATE')) || Date.now(),
+        addDate: isNaN(ad) ? Date.now() : ad * 1000,
         icon: a.getAttribute('ICON') || '',
         iconUri: a.getAttribute('ICON_URI') || '',
       }));
@@ -363,21 +375,15 @@ function exportBookmarks() {
   setStatus('已导出全部书签');
 }
 
-/**
- * 导出选中项：重建层级结构，只保留选中的 folder/bookmark。
- * 父级文件夹如果没有选中，只要它的后代有选中，就"补"出一个同名文件夹。
- */
 function exportSelected() {
   if (!root) { alert('还没有导入书签'); return; }
   if (!selectedIds.size) { alert('请先选中要导出的项'); return; }
-  // 构造一个"虚拟根"，把选中项及其祖先链重建
   const virtualRoot = newFolder(root.title, []);
-  const memo = new Map(); // folderId -> virtual folder node
+  const memo = new Map();
 
   function ensureFolderChain(folderNode) {
     if (folderNode === root) return virtualRoot;
     if (memo.has(folderNode.id)) return memo.get(folderNode.id);
-    // 找到 parent
     const r = findById(folderNode.id);
     const parentVirtual = r && r.parent ? ensureFolderChain(r.parent) : virtualRoot;
     const v = newFolder(folderNode.title, []);
@@ -387,7 +393,6 @@ function exportSelected() {
     return v;
   }
 
-  // 保证顺序：按选中 id 在原树遍历顺序处理
   const ordered = [];
   walkAll(root, (n) => { if (selectedIds.has(n.id)) ordered.push(n); });
 
@@ -399,7 +404,6 @@ function exportSelected() {
       const parentVirtual = ensureFolderChain(r.parent);
       parentVirtual.children.push({ ...n });
     } else {
-      // 文件夹：即使没选中内部书签，也把整个文件夹（原样）补进去
       const parentVirtual = ensureFolderChain(r.parent);
       const v = newFolder(n.title, deepCloneChildren(n));
       v.addDate = n.addDate;
@@ -445,14 +449,17 @@ function nodeToLines(node, depth) {
   const pad = '    '.repeat(depth);
   if (node.type === 'folder') {
     const out = [];
-    out.push(`${pad}<DT><H3 ADD_DATE="${node.addDate || ''}" LAST_MODIFIED="${node.lastModified || ''}">${esc(node.title)}</H3>`);
+    // 导出时把毫秒改回秒（Chrome 规范）
+    const ad = node.addDate ? Math.floor(node.addDate / 1000) : '';
+    const lm = node.lastModified ? Math.floor(node.lastModified / 1000) : '';
+    out.push(`${pad}<DT><H3 ADD_DATE="${ad}" LAST_MODIFIED="${lm}">${esc(node.title)}</H3>`);
     out.push(`${pad}<DL><p>`);
     for (const c of node.children) out.push(...nodeToLines(c, depth + 1));
     out.push(`${pad}</DL><p>`);
     return out;
   }
   const attrs = [`HREF="${escAttr(node.url)}"`];
-  if (node.addDate) attrs.push(`ADD_DATE="${node.addDate}"`);
+  if (node.addDate) attrs.push(`ADD_DATE="${Math.floor(node.addDate / 1000)}"`);
   if (node.icon) attrs.push(`ICON="${escAttr(node.icon)}"`);
   if (node.iconUri) attrs.push(`ICON_URI="${escAttr(node.iconUri)}"`);
   return [`${pad}<DT><A ${attrs.join(' ')}>${esc(node.title)}</A>`];
@@ -506,11 +513,45 @@ function isDescendant(ancestor, node) {
   }
   return false;
 }
-function fmtDate(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+
+/* ============================================================
+ *  内联重命名
+ * ============================================================ */
+function beginInlineEdit(node) {
+  editingId = node.id;
+  renderTree(); renderList();
+  requestAnimationFrame(() => {
+    const input = document.querySelector('.inline-edit');
+    if (input) { input.focus(); input.select(); }
+  });
+}
+function commitInlineEdit(node, value) {
+  if (editingId !== node.id) return;
+  editingId = null;
+  const v = (value || '').trim();
+  if (v) node.title = v;
+  renderTree(); renderList();
+  if (searchQuery) doSearch(searchQuery);
+  setStatus('已重命名');
+}
+function cancelInlineEdit() {
+  editingId = null;
+  renderTree(); renderList();
+}
+function makeInlineInput(node) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'inline-edit';
+  input.value = node.title || '';
+  input.onkeydown = (ev) => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') { ev.preventDefault(); commitInlineEdit(node, input.value); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); cancelInlineEdit(); }
+  };
+  input.onblur = () => commitInlineEdit(node, input.value);
+  input.onclick = (ev) => ev.stopPropagation();
+  input.ondblclick = (ev) => ev.stopPropagation();
+  return input;
 }
 
 /* ============================================================
@@ -588,7 +629,11 @@ function renderFolderNode(node) {
 
   const name = document.createElement('span');
   name.className = 'name';
-  name.textContent = node.title || '(未命名)';
+  if (editingId === node.id) {
+    name.appendChild(makeInlineInput(node));
+  } else {
+    name.textContent = node.title || '(未命名)';
+  }
   row.appendChild(name);
 
   const count = document.createElement('span');
@@ -603,7 +648,7 @@ function renderFolderNode(node) {
     renderTree(); renderList();
   };
 
-  row.draggable = true;
+  row.draggable = editingId !== node.id;
   row.ondragstart = (e) => { startDrag(e, node.id); e.dataTransfer.effectAllowed = 'move'; };
   row.ondragend = clearDragStyles;
 
@@ -707,11 +752,6 @@ function clearDragStyles() {
  *  放置逻辑
  * ============================================================ */
 function dropIntoFolder(ids, targetFolderId) {
-  if (sortState.key && currentFolder && !searchQuery) {
-    currentFolder.children = applySort(currentFolder.children.slice());
-    sortState = { key: null, dir: 1 };
-    renderList();
-  }
   const tgt = findById(targetFolderId);
   if (!tgt || tgt.node.type !== 'folder') return;
   const items = collectMovable(ids, tgt.node);
@@ -726,11 +766,6 @@ function dropIntoFolder(ids, targetFolderId) {
 }
 
 function dropSibling(ids, refNode, position) {
-  if (sortState.key && currentFolder && !searchQuery) {
-    currentFolder.children = applySort(currentFolder.children.slice());
-    sortState = { key: null, dir: 1 };
-    renderList();
-  }
   const r = findById(refNode.id);
   if (!r || !r.parent) return;
   const parent = r.parent;
@@ -775,12 +810,11 @@ function collectMovable(ids, filterSelf = null, excludeRef = null) {
  *  列表栏（表头）+ splitter
  * ============================================================ */
 const COLUMNS = [
-  { key: '__fav',  label: '',       sortable: false },
-  { key: 'title',  label: '标题',   sortable: true },
-  { key: 'url',    label: '网址',   sortable: true },
-  { key: 'status', label: '状态',   sortable: true },
-  { key: 'date',   label: '添加时间', sortable: true },
-  { key: 'tag',    label: '位置',   sortable: true,  onlySearch: true },
+  { key: '__fav',  label: '',     sortable: false },
+  { key: 'title',  label: '标题', sortable: true },
+  { key: 'url',    label: '网址', sortable: true },
+  { key: 'status', label: '状态', sortable: true },
+  { key: 'tag',    label: '位置', sortable: true,  onlySearch: true },
 ];
 
 function visibleColumns() {
@@ -789,6 +823,11 @@ function visibleColumns() {
     if (c.onlySearch && !isSearch) return false;
     return true;
   });
+}
+
+function applyWidthToDom(key, w) {
+  document.querySelectorAll(`.list-header .col[data-key="${key}"]`).forEach(el => el.style.width = w + 'px');
+  document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`).forEach(el => el.style.width = w + 'px');
 }
 
 function renderListHeader() {
@@ -816,19 +855,14 @@ function renderListHeader() {
     if (col.sortable) d.onclick = () => toggleSort(col.key);
     el.appendChild(d);
 
-    // 每列右侧都有 splitter
     const sp = document.createElement('div');
     sp.className = 'splitter';
     sp.dataset.leftKey = col.key;
-    sp.dataset.rightKey = i + 1 < cols.length ? cols[i + 1].key : null;
-    sp.onmousedown = (e) => beginColResize(e, col.key, sp.dataset.rightKey);
-    sp.ondblclick = (e) => {
-      e.preventDefault();
-      autoFitColumn(col.key);
-    };
+    sp.dataset.rightKey = i + 1 < cols.length ? cols[i + 1].key : '';
+    sp.onmousedown = (e) => beginColResize(e, col.key, i + 1 < cols.length ? cols[i + 1].key : null);
+    sp.ondblclick = (e) => { e.preventDefault(); autoFitColumn(col.key); };
     el.appendChild(sp);
   });
-  // 末尾 filler，让 header 撑满剩余宽度
   const filler = document.createElement('div');
   filler.style.flex = '1';
   el.appendChild(filler);
@@ -836,24 +870,45 @@ function renderListHeader() {
 
 function beginColResize(e, leftKey, rightKey) {
   e.preventDefault();
+  const headerEl = document.getElementById('listHeader');
+  if (!headerEl) return;
+  const containerWidth = headerEl.clientWidth;
   const startX = e.clientX;
   const startL = colWidths[leftKey] || DEFAULT_COLS[leftKey] || 100;
-  const startR = rightKey ? (colWidths[rightKey] || DEFAULT_COLS[rightKey] || 100) : null;
+  const startR = rightKey ? (colWidths[rightKey] || DEFAULT_COLS[rightKey] || 100) : 0;
+  const cols = visibleColumns();
+  const splittersW = cols.length * 5;
+  const otherFixed = cols.reduce((s, c) => {
+    if (c.key === leftKey) return s;
+    return s + (colWidths[c.key] || DEFAULT_COLS[c.key] || 100);
+  }, 0) + splittersW;
+  const maxL = Math.max(20, containerWidth - otherFixed);
+
   const splitter = e.currentTarget;
   splitter.classList.add('dragging');
   document.body.classList.add('col-resizing');
 
   const onMove = (ev) => {
     const dx = ev.clientX - startX;
-    const newL = Math.max(20, startL + dx);
-    colWidths[leftKey] = newL;
-    document.querySelectorAll(`.list-header .col[data-key="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
-    document.querySelectorAll(`.list-item > *[data-colkey="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
-    if (rightKey && startR !== null) {
-      const newR = Math.max(20, startR - dx);
+    let newL = startL + dx;
+    if (newL < 20) newL = 20;
+    if (newL > maxL) newL = maxL;
+
+    if (rightKey) {
+      const delta = newL - startL;
+      let newR = startR - delta;
+      if (newR < 20) {
+        newR = 20;
+        newL = startL + startR - 20;
+        if (newL < 20) newL = 20;
+      }
+      colWidths[leftKey] = newL;
       colWidths[rightKey] = newR;
-      document.querySelectorAll(`.list-header .col[data-key="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
-      document.querySelectorAll(`.list-item > *[data-colkey="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
+      applyWidthToDom(leftKey, newL);
+      applyWidthToDom(rightKey, newR);
+    } else {
+      colWidths[leftKey] = newL;
+      applyWidthToDom(leftKey, newL);
     }
   };
   const onUp = () => {
@@ -868,17 +923,15 @@ function beginColResize(e, leftKey, rightKey) {
 }
 
 function autoFitColumn(key) {
-  // 量所有可见的该列宽度
   const samples = document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`);
-  let max = 60;
+  let max = 40;
   samples.forEach(el => {
-    // 用一个隐藏 span 量文字宽度
     const text = el.textContent || '';
     const span = document.createElement('span');
     span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:13px "Segoe UI","Microsoft YaHei",sans-serif;';
     span.textContent = text;
     document.body.appendChild(span);
-    const w = span.getBoundingClientRect().width + 22; // padding 余量
+    const w = span.getBoundingClientRect().width + 14;
     document.body.removeChild(span);
     if (w > max) max = w;
   });
@@ -886,7 +939,7 @@ function autoFitColumn(key) {
   colWidths[key] = max;
   saveColWidths();
   renderListHeader();
-  document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`).forEach(el => el.style.width = max + 'px');
+  applyWidthToDom(key, max);
 }
 
 function toggleSort(key) {
@@ -902,7 +955,6 @@ function applySort(items) {
       case 'title': return (it.title || '').toLowerCase();
       case 'url': return (it.url || '').toLowerCase();
       case 'status': return it.linkStatus || '';
-      case 'date': return it.addDate || 0;
       case 'tag': { const p = findParentFolderOf(it.id); return (p ? p.title : '').toLowerCase(); }
       default: return '';
     }
@@ -958,7 +1010,6 @@ function renderList() {
     : (root && currentFolder ? folderPath(currentFolder) : '');
   selectAllBtn.style.display = 'inline-block';
 
-  // 全选/全不选 两态文字
   const allSelected = items.length > 0 && items.every(i => selectedIds.has(i.id));
   selectAllBtn.textContent = allSelected ? '全不选' : '全选';
 
@@ -994,7 +1045,20 @@ function renderList() {
         }
       } else if (col.key === 'title') {
         cell.classList.add('title');
-        cell.textContent = (it.type === 'folder' ? '📁 ' : '') + (it.title || '(未命名)');
+        if (it.type === 'folder') {
+          const icon = document.createElement('span');
+          icon.className = 'title-icon';
+          icon.textContent = '📁 ';
+          cell.appendChild(icon);
+        }
+        if (editingId === it.id) {
+          cell.appendChild(makeInlineInput(it));
+        } else {
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'title-name';
+          nameSpan.textContent = it.title || '(未命名)';
+          cell.appendChild(nameSpan);
+        }
       } else if (col.key === 'url') {
         cell.classList.add('url');
         cell.textContent = it.type === 'folder'
@@ -1005,9 +1069,6 @@ function renderList() {
           cell.classList.add(it.linkStatus);
           cell.textContent = it.linkStatus === 'ok' ? '可用' : it.linkStatus === 'bad' ? '失效' : '检查中';
         }
-      } else if (col.key === 'date') {
-        cell.classList.add('date');
-        cell.textContent = fmtDate(it.addDate);
       } else if (col.key === 'tag') {
         cell.classList.add('tag');
         const p = findParentFolderOf(it.id);
@@ -1017,6 +1078,7 @@ function renderList() {
     });
 
     row.onclick = (e) => {
+      if (editingId === it.id) return;
       if (e.ctrlKey || e.metaKey) {
         if (selectedIds.has(it.id)) selectedIds.delete(it.id);
         else selectedIds.add(it.id);
@@ -1050,7 +1112,7 @@ function renderList() {
       showContextMenu(e.clientX, e.clientY, it);
     };
 
-    row.draggable = true;
+    row.draggable = editingId !== it.id;
     row.ondragstart = (e) => { startDrag(e, it.id); e.dataTransfer.effectAllowed = 'move'; };
     row.ondragend = clearDragStyles;
 
@@ -1104,15 +1166,11 @@ function faviconUrl(url) {
 }
 
 function reorderMulti(ids, targetId, before) {
-  // === 新增：如果当前有列排序，先把真实顺序固化成显示顺序 ===
   if (sortState.key && currentFolder && !searchQuery) {
-    const displayed = applySort(currentFolder.children.slice());
-    currentFolder.children = displayed;
+    currentFolder.children = applySort(currentFolder.children.slice());
     sortState = { key: null, dir: 1 };
-    // 需要重渲一次，否则 row 的 data-id 索引和真实顺序对不上
     renderList();
   }
-  // === 新增结束 ===
   const tgt = findById(targetId);
   if (!tgt) return;
   const targetParent = tgt.parent || root;
@@ -1140,28 +1198,44 @@ function reorderMulti(ids, targetId, before) {
  *  删除 / 新建
  * ============================================================ */
 function deleteSelected() {
-  if (!selectedIds.size) { alert('没有选中任何项'); return; }
-  if (!confirm('确定删除选中的 ' + selectedIds.size + ' 项？')) return;
-  const ids = [...selectedIds];
-  for (const id of ids) {
-    const r = findById(id);
-    if (r && r.parent && r.node !== root) r.parent.children = r.parent.children.filter(c => c.id !== id);
+  // 优先删列表选中；如果列表没选，就尝试删树状栏当前文件夹
+  if (selectedIds.size) {
+    if (!confirm('确定删除选中的 ' + selectedIds.size + ' 项？')) return;
+    const ids = [...selectedIds];
+    for (const id of ids) {
+      const r = findById(id);
+      if (r && r.parent && r.node !== root) r.parent.children = r.parent.children.filter(c => c.id !== id);
+    }
+    selectedIds.clear();
+    renderTree(); renderList();
+    if (searchQuery) doSearch(searchQuery);
+    setStatus('已删除 ' + ids.length + ' 项');
+    return;
   }
-  selectedIds.clear();
-  renderTree(); renderList();
-  if (searchQuery) doSearch(searchQuery);
-  setStatus('已删除 ' + ids.length + ' 项');
+  if (currentFolder && currentFolder !== root) {
+    if (!confirm('确定删除文件夹「' + currentFolder.title + '」及其中全部内容？')) return;
+    const r = findById(currentFolder.id);
+    if (!r || !r.parent) return;
+    r.parent.children = r.parent.children.filter(c => c.id !== currentFolder.id);
+    currentFolder = r.parent;
+    renderTree(); renderList();
+    setStatus('已删除文件夹');
+    return;
+  }
+  setStatus('没有可删除的对象');
 }
 function createFolder() {
   if (!root) { alert('请先导入书签'); return; }
   const parent = currentFolder || root;
   const name = prompt('新文件夹名称：', '新建文件夹');
   if (name === null) return;
-  parent.children.unshift(newFolder(name.trim() || '新建文件夹'));
+  const f = newFolder(name.trim() || '新建文件夹');
+  parent.children.unshift(f);
   renderTree(); renderList();
+  // 进入编辑态
+  beginInlineEdit(f);
   setStatus('已创建文件夹');
 }
-
 function createBookmark() {
   if (!root) { alert('请先导入书签'); return; }
   const parent = currentFolder || root;
@@ -1230,7 +1304,6 @@ function findDupDialog() {
     return;
   }
 
-  // 生成 log
   const now = new Date().toLocaleString();
   const logLines = [
     `# 重复书签日志`,
@@ -1274,7 +1347,6 @@ function findDupDialog() {
       }},
     { label: '取消', action: closeModal },
     { label: `确定删除 ${dups.length} 项重复`, primary: true, action: () => {
-        // 真正执行删除
         for (const r of dups) {
           if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
         }
@@ -1287,7 +1359,7 @@ function findDupDialog() {
 }
 
 /* ============================================================
- *  批量编辑
+ *  批量编辑（含正则）
  * ============================================================ */
 function openBatchEdit() {
   const ids = [...selectedIds];
@@ -1297,13 +1369,35 @@ function openBatchEdit() {
     <p style="color:var(--muted); font-size:12px; margin-bottom:10px;">
       作用范围：${ids.length ? '选中的 ' + ids.length + ' 项' : '当前视图可见的 ' + all.length + ' 项'}（文件夹忽略）
     </p>
-    <label>查找</label><input type="text" id="be-find" placeholder="http://">
+    <label>查找（纯文本）</label><input type="text" id="be-find" placeholder="http://">
     <label>替换为</label><input type="text" id="be-replace" placeholder="https://">
     <label>URL 前缀</label><input type="text" id="be-prefix" placeholder="https://web.archive.org/">
     <label>标题前缀 / 后缀</label>
     <div style="display:flex; gap:8px;">
       <input type="text" id="be-title-prefix" placeholder="前缀" style="flex:1;">
       <input type="text" id="be-title-suffix" placeholder="后缀" style="flex:1;">
+    </div>
+
+    <div style="border-top:1px solid var(--border); margin-top:14px; padding-top:10px;">
+      <label style="display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="be-regex-enabled">
+        <b style="color:var(--text);">启用正则替换（高级）</b>
+      </label>
+      <label>应用到</label>
+      <select id="be-regex-target">
+        <option value="title">仅标题</option>
+        <option value="url">仅网址</option>
+        <option value="both">标题和网址</option>
+      </select>
+      <label>正则模式</label>
+      <input type="text" id="be-regex-pattern" placeholder="例如 ^Download\\s+(.+?)\\s+[\\{\\[].*$">
+      <label>替换为（$1 $2 表示捕获组）</label>
+      <input type="text" id="be-regex-replace" placeholder="例如 $1">
+      <p style="color:var(--muted); font-size:11px; margin-top:8px; line-height:1.7;">
+        示例：要去掉 "Download 标题 {中文} 1080p || ..." 这类长尾巴，<br>
+        模式填 <code>^Download\\s+(.+?)\\s+[\\{\\[].*$</code>，替换填 <code>$1</code>。<br>
+        想去掉 " || " 后面的所有内容，模式填 <code>\\s*\\|\\|.*$</code>，替换留空。
+      </p>
     </div>
   `, [
     { label: '取消', action: closeModal },
@@ -1313,6 +1407,18 @@ function openBatchEdit() {
       const prefix = document.getElementById('be-prefix').value;
       const tPrefix = document.getElementById('be-title-prefix').value;
       const tSuffix = document.getElementById('be-title-suffix').value;
+      const regexEnabled = document.getElementById('be-regex-enabled').checked;
+      const regexTarget = document.getElementById('be-regex-target').value;
+      const regexPattern = document.getElementById('be-regex-pattern').value;
+      const regexReplace = document.getElementById('be-regex-replace').value;
+
+      let re = null;
+      if (regexEnabled) {
+        if (!regexPattern) { alert('启用了正则但模式为空'); return; }
+        try { re = new RegExp(regexPattern, 'g'); }
+        catch (err) { alert('正则表达式错误：' + err.message); return; }
+      }
+
       let count = 0;
       for (const id of all) {
         const r = findById(id);
@@ -1325,6 +1431,14 @@ function openBatchEdit() {
         if (prefix) bm.url = prefix + bm.url;
         if (tPrefix) bm.title = tPrefix + bm.title;
         if (tSuffix) bm.title = bm.title + tSuffix;
+        if (re) {
+          if (regexTarget === 'title' || regexTarget === 'both') {
+            bm.title = bm.title.replace(re, regexReplace);
+          }
+          if (regexTarget === 'url' || regexTarget === 'both') {
+            bm.url = bm.url.replace(re, regexReplace);
+          }
+        }
         count++;
       }
       closeModal();
@@ -1456,10 +1570,7 @@ function showContextMenu(x, y, node) {
 
   if (node.type === 'bookmark') {
     add('🔗 打开链接', () => window.open(node.url, '_blank'));
-    add('✏️ 重命名', () => {
-      const name = prompt('新名称：', node.title);
-      if (name !== null) { node.title = name; renderTree(); if (searchQuery) doSearch(searchQuery); else renderList(); }
-    });
+    add('✏️ 重命名 (F2)', () => beginInlineEdit(node));
     add('🌐 编辑 URL', () => {
       const url = prompt('新 URL：', node.url);
       if (url !== null) { node.url = url; if (searchQuery) doSearch(searchQuery); else renderList(); }
@@ -1467,13 +1578,15 @@ function showContextMenu(x, y, node) {
     sep();
     add('📋 复制 URL', () => navigator.clipboard.writeText(node.url));
   } else {
-    add('✏️ 重命名文件夹', () => {
-      const name = prompt('新名称：', node.title);
-      if (name !== null) { node.title = name; renderTree(); renderList(); }
-    });
+    add('✏️ 重命名 (F2)', () => beginInlineEdit(node));
     add('📁 在此新建文件夹', () => {
       const name = prompt('新文件夹名称：', '新建文件夹');
-      if (name !== null) { node.children.unshift(newFolder(name.trim() || '新建文件夹')); renderTree(); renderList(); }
+      if (name !== null) {
+        const f = newFolder(name.trim() || '新建文件夹');
+        node.children.unshift(f);
+        renderTree(); renderList();
+        beginInlineEdit(f);
+      }
     });
   }
   sep();
@@ -1487,6 +1600,7 @@ function showContextMenu(x, y, node) {
       if (!confirm('确定删除「' + node.title + '」？')) return;
       const r = findById(node.id);
       if (r && r.parent) r.parent.children = r.parent.children.filter(c => c.id !== node.id);
+      if (currentFolder === node) currentFolder = r.parent || root;
       renderTree(); if (searchQuery) doSearch(searchQuery); else renderList();
     }, true);
   }
@@ -1523,10 +1637,11 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.3.0</b> · 全部折叠/展开、列表拖入文件夹、drop 标记法（防弹回）、导出选中、列表加时间列、splitter 双击自适应 + 末列可拉、全选两态、查找重复（先报告再确认删除）<br>
+      <b>v1.3.1</b> · Splitter 拖动加钳制（防崩坏）、Delete 可删树状文件夹、F2 内联重命名（无弹窗）、批量编辑加正则替换、去掉时间列<br>
+      <b>v1.3.0</b> · 全部折叠/展开、列表拖入文件夹、drop 标记防弹回、导出选中、查找重复（先报告再确认删除）<br>
       <b>v1.2.1</b> · 修复拖拽失效（dragstart 不再重渲 DOM）<br>
       <b>v1.2.0</b> · 列宽 splitter、多选拖拽、树同级插入<br>
-      <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志；修复搜索全选<br>
+      <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
     </p>
   `);
@@ -1604,20 +1719,22 @@ document.getElementById('searchBox').oninput = (e) => doSearch(e.target.value);
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'Delete') deleteSelected();
+  if (e.key === 'F2') {
+    e.preventDefault();
+    let targetNode = null;
+    if (selectedIds.size === 1) {
+      const r = findById([...selectedIds][0]);
+      if (r) targetNode = r.node;
+    } else if (currentFolder && currentFolder !== root) {
+      targetNode = currentFolder;
+    }
+    if (targetNode) beginInlineEdit(targetNode);
+    return;
+  }
   if (e.ctrlKey && e.key === 'a') {
     e.preventDefault();
     (searchQuery ? currentSearchResults : getVisibleItems()).forEach(i => selectedIds.add(i.id));
     if (searchQuery) doSearch(searchQuery); else renderList();
-  }
-  if (e.key === 'F2' && selectedIds.size === 1) {
-    const r = findById([...selectedIds][0]);
-    if (r) {
-      const name = prompt('重命名：', r.node.title);
-      if (name !== null) {
-        r.node.title = name; renderTree();
-        if (searchQuery) doSearch(searchQuery); else renderList();
-      }
-    }
   }
   if (e.key === 'Escape') { hideContextMenu(); closeModal(); }
 });
