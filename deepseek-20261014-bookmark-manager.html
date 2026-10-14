@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.1.0</title>
-<!-- 书签管理器 Pro v1.1.0 | 2026-10-14 -->
+<title>书签管理器 Pro v1.2.0</title>
+<!-- 书签管理器 Pro v1.2.0 | 2026-10-14 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -64,6 +64,20 @@
   .tree-row .count { color: var(--muted); font-size: 11px; }
   .tree-row.active .count { color: #ddd; }
   .tree-children { margin-left: 14px; }
+  /* 树状栏间隙 drop 区 */
+  .tree-gap {
+    height: 4px; margin: 0; border-radius: 2px;
+  }
+  .tree-gap.active {
+    background: var(--accent); height: 3px; margin: 1px 0;
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .tree-gap-inner {
+    height: 6px; border-radius: 3px;
+  }
+  .tree-gap-inner.active {
+    background: var(--accent); box-shadow: 0 0 6px var(--accent);
+  }
 
   .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .content-header {
@@ -71,54 +85,63 @@
     display: flex; align-items: center; gap: 10px; background: var(--panel);
   }
   .content-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
-  /* 列表栏（表头） */
+  /* 列表栏（表头）*/
   .list-header {
-    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    display: flex; align-items: stretch; padding: 0;
     background: var(--panel2); border-bottom: 1px solid var(--border);
     font-size: 11px; color: var(--muted); user-select: none;
-    position: sticky; top: 0; z-index: 5;
+    position: sticky; top: 0; z-index: 5; height: 28px;
   }
   .list-header .col {
-    cursor: pointer; display: flex; align-items: center; gap: 3px;
-    padding: 2px 4px; border-radius: 3px;
+    display: flex; align-items: center; gap: 3px; cursor: pointer;
+    padding: 0 6px; overflow: hidden; white-space: nowrap;
+    position: relative; flex-shrink: 0;
+  }
+  .list-header .col .col-label {
+    flex: 1; overflow: hidden; text-overflow: ellipsis;
   }
   .list-header .col:hover { background: var(--border); color: var(--text); }
   .list-header .col .arrow { font-size: 9px; }
-  .col-fav { width: 20px; flex-shrink: 0; cursor: default !important; }
-  .col-title { flex: 0 0 220px; min-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .col-url { flex: 1; min-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .col-status { flex: 0 0 60px; text-align: center; }
-  .col-tag { flex: 0 0 100px; }
-  .col-type { flex: 0 0 70px; }
+  .list-header .col.fav-col { cursor: default; justify-content: center; padding: 0; }
+  .list-header .col.fav-col:hover { background: transparent; color: var(--muted); }
+  /* splitter 拉杆 */
+  .splitter {
+    width: 5px; cursor: col-resize; flex-shrink: 0;
+    background: transparent; position: relative;
+  }
+  .splitter::after {
+    content: ''; position: absolute; left: 2px; top: 4px; bottom: 4px;
+    width: 1px; background: var(--border);
+  }
+  .splitter:hover::after, .splitter.dragging::after {
+    background: var(--accent); width: 2px; left: 1.5px;
+  }
+  body.col-resizing { cursor: col-resize !important; }
+  body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
 
   .list { flex: 1; overflow-y: auto; padding: 6px; position: relative; }
   .list-item {
-    display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+    display: flex; align-items: center; padding: 7px 0;
     border-radius: 5px; cursor: pointer; margin-bottom: 2px;
     user-select: none;
   }
   .list-item:hover { background: var(--panel2); }
   .list-item.selected { background: var(--accent); color: #fff; }
-  .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; }
-  .list-item .title { flex: 0 0 220px; min-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-  .list-item .url { flex: 1; min-width: 100px; color: var(--muted); font-size: 11px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-item > span, .list-item > img { flex-shrink: 0; padding: 0 6px; }
+  .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; margin: 0 6px; }
+  .list-item .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-item .url { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item.selected .url { color: #e0e0e0; }
-  .list-item .status { flex: 0 0 60px; text-align: center; font-size: 11px; padding: 1px 6px; border-radius: 8px; }
+  .list-item .status { text-align: center; font-size: 11px; border-radius: 8px; padding: 1px 6px; margin: 0 6px; }
   .list-item.selected .status { background: rgba(255,255,255,.2) !important; color: #fff !important; }
   .status.ok { background: rgba(158,206,106,.2); color: var(--ok); }
   .status.bad { background: rgba(247,118,142,.2); color: var(--danger); }
   .status.pending { background: rgba(224,175,104,.2); color: var(--warn); }
-  .list-item .tag {
-    flex: 0 0 100px; font-size: 10px; padding: 1px 5px; border-radius: 3px;
-    background: var(--panel2); color: var(--muted); overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
-  }
+  .list-item .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
   .list-item.selected .tag { background: rgba(255,255,255,.2); color: #fff; }
-  .list-item .type { flex: 0 0 70px; font-size: 11px; color: var(--muted); }
+  .list-item .type { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item.selected .type { color: #fff; }
 
-  /* 框选矩形 */
   .marquee {
     position: fixed; border: 1px solid var(--accent);
     background: rgba(122,162,247,.15); pointer-events: none; z-index: 999;
@@ -162,17 +185,12 @@
     font-size: 11.5px; line-height: 1.6; max-height: 380px; overflow: auto;
     white-space: pre-wrap; word-break: break-all; color: #cdd6f4;
   }
-  .log-box .l-del { color: var(--danger); }
-  .log-box .l-keep { color: var(--ok); }
-  .log-box .l-dim { color: var(--muted); }
-  .log-box .l-head { color: var(--accent2); font-weight: bold; }
 
   .statusbar {
     padding: 4px 12px; background: var(--panel); border-top: 1px solid var(--border);
     font-size: 11px; color: var(--muted); display: flex; justify-content: space-between;
   }
   .dragging { opacity: .4; }
-  .drop-line { height: 2px; background: var(--accent); margin: 2px 0; }
   .empty { text-align: center; color: var(--muted); padding: 40px; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -208,7 +226,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.1.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.2.0</span>
   </div>
 </div>
 
@@ -245,9 +263,9 @@
 
 <script>
 /* ============================================================
- *  版本信息
+ *  版本
  * ============================================================ */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 /* ============================================================
  *  数据模型
@@ -259,10 +277,29 @@ let searchQuery = '';
 let uidCounter = 0;
 const uid = () => 'n' + (++uidCounter) + '_' + Date.now().toString(36);
 
-// 排序状态（当前列表视图）
-// key: 'title' | 'url' | 'status' | 'tag' | 'type' | null
-// dir: 1 升序 / -1 降序
 let sortState = { key: null, dir: 1 };
+
+/* 列宽（px）。键名对应列 key；'__fav' 特殊。 */
+const DEFAULT_COLS = {
+  '__fav': 28,
+  'title': 240,
+  'url': 400,
+  'status': 70,
+  'tag': 110,
+  'type': 80,
+};
+let colWidths = loadColWidths();
+
+function loadColWidths() {
+  try {
+    const s = localStorage.getItem('bm_col_widths');
+    if (s) return Object.assign({}, DEFAULT_COLS, JSON.parse(s));
+  } catch (e) {}
+  return Object.assign({}, DEFAULT_COLS);
+}
+function saveColWidths() {
+  try { localStorage.setItem('bm_col_widths', JSON.stringify(colWidths)); } catch (e) {}
+}
 
 function newFolder(title, children = []) {
   return { id: uid(), type: 'folder', title, children, addDate: Date.now(), lastModified: Date.now() };
@@ -272,17 +309,14 @@ function newBookmark(title, url, extra = {}) {
 }
 
 /* ============================================================
- *  Netscape Bookmark 解析
+ *  解析 / 导出（同前）
  * ============================================================ */
 function parseBookmarks(html) {
   const parser = new DOMParser();
   let cleanHtml = html.replace(/<!DOCTYPE[^>]*>/gi, '');
   let doc;
-  try {
-    doc = parser.parseFromString(cleanHtml, 'text/html');
-  } catch (e) {
-    doc = parser.parseFromString('<html><body>' + cleanHtml + '</body></html>', 'text/html');
-  }
+  try { doc = parser.parseFromString(cleanHtml, 'text/html'); }
+  catch (e) { doc = parser.parseFromString('<html><body>' + cleanHtml + '</body></html>', 'text/html'); }
   const firstDl = doc.querySelector('dl');
   if (!firstDl) throw new Error('未找到 <DL> 结构，可能不是 Chrome 书签文件');
   const rootFolder = newFolder('书签栏');
@@ -304,25 +338,17 @@ function parseDl(dl) {
       if (subDl) folder.children = parseDl(subDl);
       items.push(folder);
     } else if (a) {
-      const bm = newBookmark(
-        cleanText(a.textContent),
-        a.getAttribute('HREF') || '',
-        {
-          addDate: parseInt(a.getAttribute('ADD_DATE')) || Date.now(),
-          icon: a.getAttribute('ICON') || '',
-          iconUri: a.getAttribute('ICON_URI') || '',
-        }
-      );
-      items.push(bm);
+      items.push(newBookmark(cleanText(a.textContent), a.getAttribute('HREF') || '', {
+        addDate: parseInt(a.getAttribute('ADD_DATE')) || Date.now(),
+        icon: a.getAttribute('ICON') || '',
+        iconUri: a.getAttribute('ICON_URI') || '',
+      }));
     }
   }
   return items;
 }
 function cleanText(t) { return (t || '').replace(/\s+/g, ' ').trim(); }
 
-/* ============================================================
- *  Netscape Bookmark 导出
- * ============================================================ */
 function exportBookmarks() {
   if (!root) { alert('还没有导入书签'); return; }
   const lines = [];
@@ -336,13 +362,11 @@ function exportBookmarks() {
   lines.push('<DL><p>');
   for (const child of root.children) lines.push(...nodeToLines(child, 1));
   lines.push('</DL><p>');
-  const html = lines.join('\n');
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const blob = new Blob([lines.join('\n')], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const ts = new Date().toISOString().slice(0,10);
-  a.download = `bookmarks_${ts}.html`;
+  a.download = `bookmarks_${new Date().toISOString().slice(0,10)}.html`;
   a.click();
   URL.revokeObjectURL(url);
   setStatus('已导出 ' + a.download);
@@ -356,19 +380,18 @@ function nodeToLines(node, depth) {
     for (const c of node.children) out.push(...nodeToLines(c, depth + 1));
     out.push(`${pad}</DL><p>`);
     return out;
-  } else {
-    const attrs = [`HREF="${escAttr(node.url)}"`];
-    if (node.addDate) attrs.push(`ADD_DATE="${node.addDate}"`);
-    if (node.icon) attrs.push(`ICON="${escAttr(node.icon)}"`);
-    if (node.iconUri) attrs.push(`ICON_URI="${escAttr(node.iconUri)}"`);
-    return [`${pad}<DT><A ${attrs.join(' ')}>${esc(node.title)}</A>`];
   }
+  const attrs = [`HREF="${escAttr(node.url)}"`];
+  if (node.addDate) attrs.push(`ADD_DATE="${node.addDate}"`);
+  if (node.icon) attrs.push(`ICON="${escAttr(node.icon)}"`);
+  if (node.iconUri) attrs.push(`ICON_URI="${escAttr(node.iconUri)}"`);
+  return [`${pad}<DT><A ${attrs.join(' ')}>${esc(node.title)}</A>`];
 }
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s) { return esc(s).replace(/"/g,'&quot;'); }
 
 /* ============================================================
- *  遍历工具
+ *  遍历 / 工具
  * ============================================================ */
 function walkAll(node, cb, parent = null) {
   cb(node, parent);
@@ -385,10 +408,7 @@ function findById(id, node = root, parent = null) {
   }
   return null;
 }
-function findParentFolderOf(id) {
-  const r = findById(id);
-  return r ? r.parent : null;
-}
+function findParentFolderOf(id) { const r = findById(id); return r ? r.parent : null; }
 function countBookmarks(node) {
   if (node.type === 'bookmark') return 1;
   return node.children.reduce((s, c) => s + countBookmarks(c), 0);
@@ -399,14 +419,13 @@ function countAll(node) {
 }
 function folderPath(node) {
   const path = [];
-  function find(n, target, acc) {
+  (function find(n, target, acc) {
     if (n === target) { path.push(...acc, n.title); return true; }
     if (n.type === 'folder') {
       for (const c of n.children) if (find(c, target, [...acc, n.title])) return true;
     }
     return false;
-  }
-  find(root, node, []);
+  })(root, node, []);
   return path.join(' / ');
 }
 function isDescendant(ancestor, node) {
@@ -419,7 +438,7 @@ function isDescendant(ancestor, node) {
 }
 
 /* ============================================================
- *  渲染：树
+ *  树渲染（含同级间隙 drop 区）
  * ============================================================ */
 const collapsed = new Set();
 
@@ -430,11 +449,70 @@ function renderTree() {
     treeEl.innerHTML = '<div class="empty">尚未导入书签</div>';
     return;
   }
-  treeEl.appendChild(renderTreeNode(root, 0));
+  // 根节点本身不可拖、不可删；它的子级统一渲染
+  const rootRow = document.createElement('div');
+  rootRow.className = 'tree-row';
+  if (currentFolder === root) rootRow.classList.add('active');
+  rootRow.innerHTML = `<span class="arrow">▼</span><span class="icon">📁</span><span class="name">${esc(root.title)}</span><span class="count">${countBookmarks(root)}</span>`;
+  rootRow.onclick = () => { currentFolder = root; selectedIds.clear(); sortState = { key: null, dir: 1 }; renderTree(); renderList(); };
+  treeEl.appendChild(rootRow);
+
+  const container = document.createElement('div');
+  container.className = 'tree-children';
+  renderChildrenInto(container, root);
+  treeEl.appendChild(container);
+
   document.getElementById('totalCount').textContent =
     countAll(root) + ' 项 / ' + countBookmarks(root) + ' 书签';
 }
-function renderTreeNode(node, depth) {
+
+/**
+ * 把 folder 的所有子级（文件夹 + 间隙）渲染进 container。
+ * 每个子项前后都有间隙 drop 区，可以插入到同级。
+ * 递归时同样处理。
+ */
+function renderChildrenInto(container, folder) {
+  const children = folder.children;
+  // 顶部间隙
+  container.appendChild(makeGap(folder, 0));
+
+  children.forEach((child, i) => {
+    if (child.type === 'folder') {
+      container.appendChild(renderFolderNode(child, folder, i));
+    }
+    // 文件夹后面跟一个间隙（用于"插到这个文件夹之后"）
+    container.appendChild(makeGap(folder, i + 1));
+  });
+}
+
+/**
+ * 生成一个同级间隙 drop 区。
+ * parentFolder: 间隙归属的父文件夹
+ * insertIndex: 插入到父文件夹 children 的哪个位置
+ */
+function makeGap(parentFolder, insertIndex) {
+  const gap = document.createElement('div');
+  gap.className = 'tree-gap';
+  gap.dataset.parentId = parentFolder.id;
+  gap.dataset.index = insertIndex;
+
+  gap.ondragover = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    gap.classList.add('active');
+  };
+  gap.ondragleave = () => gap.classList.remove('active');
+  gap.ondrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    gap.classList.remove('active');
+    const ids = getDragIds(e);
+    dropToGap(ids, parentFolder.id, insertIndex);
+  };
+  return gap;
+}
+
+function renderFolderNode(node, parentFolder, indexInParent) {
   const wrap = document.createElement('div');
   wrap.className = 'tree-node';
 
@@ -443,7 +521,7 @@ function renderTreeNode(node, depth) {
   if (currentFolder === node) row.classList.add('active');
   row.dataset.id = node.id;
 
-  const hasChildren = node.type === 'folder' && node.children.length > 0;
+  const hasChildren = node.children.length > 0;
   const isCollapsed = collapsed.has(node.id);
 
   const arrow = document.createElement('span');
@@ -458,8 +536,7 @@ function renderTreeNode(node, depth) {
   row.appendChild(arrow);
 
   const icon = document.createElement('span');
-  icon.className = 'icon';
-  icon.textContent = node.type === 'folder' ? '📁' : '🔗';
+  icon.className = 'icon'; icon.textContent = '📁';
   row.appendChild(icon);
 
   const name = document.createElement('span');
@@ -467,75 +544,203 @@ function renderTreeNode(node, depth) {
   name.textContent = node.title || '(未命名)';
   row.appendChild(name);
 
-  if (node.type === 'folder') {
-    const count = document.createElement('span');
-    count.className = 'count';
-    count.textContent = countBookmarks(node);
-    row.appendChild(count);
-  }
+  const count = document.createElement('span');
+  count.className = 'count';
+  count.textContent = countBookmarks(node);
+  row.appendChild(count);
 
   row.onclick = () => {
     currentFolder = node;
     selectedIds.clear();
     sortState = { key: null, dir: 1 };
-    renderTree();
-    renderList();
+    renderTree(); renderList();
   };
 
-  row.draggable = node !== root;
+  // 拖拽：拖到文件夹"行" = 放进文件夹内；拖到"间隙" = 插入同级
+  row.draggable = true;
   row.ondragstart = (e) => {
-    e.dataTransfer.setData('text/plain', node.id);
+    const ids = startDrag(e, node.id);
     e.dataTransfer.effectAllowed = 'move';
-    row.classList.add('dragging');
   };
-  row.ondragend = () => row.classList.remove('dragging');
+  row.ondragend = clearDragStyles;
+
   row.ondragover = (e) => {
-    if (node.type !== 'folder') return;
     e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
     row.classList.add('drop-target');
   };
   row.ondragleave = () => row.classList.remove('drop-target');
   row.ondrop = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     row.classList.remove('drop-target');
-    const srcId = e.dataTransfer.getData('text/plain');
-    moveNode(srcId, node.id);
+    const ids = getDragIds(e);
+    dropIntoFolder(ids, node.id);
   };
 
   row.oncontextmenu = (e) => {
     e.preventDefault();
-    if (node.type === 'bookmark') {
-      currentFolder = findParentFolderOf(node.id) || currentFolder;
-    } else {
-      currentFolder = node;
-    }
+    currentFolder = node;
     showContextMenu(e.clientX, e.clientY, node);
   };
 
   wrap.appendChild(row);
 
-  if (node.type === 'folder' && !isCollapsed) {
-    const childWrap = document.createElement('div');
-    childWrap.className = 'tree-children';
-    for (const c of node.children) {
-      if (c.type === 'folder') childWrap.appendChild(renderTreeNode(c, depth + 1));
-    }
-    if (childWrap.children.length) wrap.appendChild(childWrap);
+  if (!isCollapsed) {
+    const childContainer = document.createElement('div');
+    childContainer.className = 'tree-children';
+    renderChildrenInto(childContainer, node);
+    if (childContainer.children.length) wrap.appendChild(childContainer);
   }
   return wrap;
 }
 
 /* ============================================================
- *  列表栏（表头）渲染 + 排序
+ *  拖拽状态（多选）
+ * ============================================================ */
+let dragIds = [];
+
+function startDrag(e, primaryId) {
+  // 如果拖的是已选中的项，则拖动整个选区；否则只拖这一项
+  if (selectedIds.has(primaryId) && selectedIds.size > 1) {
+    dragIds = [...selectedIds];
+  } else {
+    dragIds = [primaryId];
+    selectedIds.clear();
+    selectedIds.add(primaryId);
+    renderList();
+  }
+  e.dataTransfer.setData('text/plain', primaryId);
+  e.dataTransfer.setData('application/x-bm-ids', JSON.stringify(dragIds));
+  // 高亮所有被拖的项
+  dragIds.forEach(id => {
+    const el = document.querySelector(`.list-item[data-id="${id}"], .tree-row[data-id="${id}"]`);
+    if (el) el.classList.add('dragging');
+  });
+  return dragIds;
+}
+function getDragIds(e) {
+  try {
+    const s = e.dataTransfer.getData('application/x-bm-ids');
+    if (s) return JSON.parse(s);
+  } catch (_) {}
+  const t = e.dataTransfer.getData('text/plain');
+  return t ? [t] : [];
+}
+function clearDragStyles() {
+  dragIds = [];
+  document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.drop-target, .tree-gap.active, .drop-line').forEach(el => {
+    el.classList.remove('drop-target', 'active', 'drop-line');
+    if (el.classList.contains('drop-line')) el.remove();
+  });
+}
+
+/* ============================================================
+ *  放置逻辑
+ * ============================================================ */
+function dropIntoFolder(ids, targetFolderId) {
+  const tgt = findById(targetFolderId);
+  if (!tgt || tgt.node.type !== 'folder') return;
+  const moved = moveItems(ids, (item) => {
+    // 加入目标文件夹末尾
+    tgt.node.children.push(item);
+  }, /*keepOrder*/ false, /*filterSelf*/ tgt.node);
+  renderTree(); renderList();
+  if (searchQuery) doSearch(searchQuery);
+  if (moved) setStatus(`已移动 ${moved} 项到「${tgt.node.title}」`);
+}
+
+/**
+ * 拖到同级间隙：把 items 插到 parentFolder.children 的 insertIndex 处。
+ * 处理：先移除所有待移动项，再按 index 插入（顺序保持）。
+ */
+function dropToGap(ids, parentFolderId, insertIndex) {
+  const p = findById(parentFolderId);
+  if (!p || p.node.type !== 'folder') return;
+  const parent = p.node;
+
+  // 过滤掉不合法项
+  const items = [];
+  const seen = new Set();
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const r = findById(id);
+    if (!r || r.node === root) continue;
+    if (parent === r.node) continue;
+    // 不能把父节点拖进自己的子级
+    if (isDescendant(r.node, parent)) continue;
+    items.push(r);
+  }
+  if (!items.length) return;
+
+  // 记录 insertIndex 对应的目标锚点 id（因为移除会改变 index）
+  // 简单做法：把 insertIndex 视为"在 parent.children 第 insertIndex 个元素之前"
+  const beforeId = parent.children[insertIndex] ? parent.children[insertIndex].id : null;
+
+  // 从原父移除
+  for (const r of items) {
+    if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
+  }
+  // 重新定位插入点
+  let idx = beforeId ? parent.children.findIndex(c => c.id === beforeId) : parent.children.length;
+  if (idx === -1) idx = parent.children.length;
+
+  parent.children.splice(idx, 0, ...items.map(r => r.node));
+  sortState = { key: null, dir: 1 };
+  renderTree(); renderList();
+  if (searchQuery) doSearch(searchQuery);
+  setStatus(`已移动 ${items.length} 项`);
+}
+
+/**
+ * 把 items 从原位置搬到 applyTo(item) 指定的新位置。
+ * filterSelf: 如果拖拽项包含 filterSelf 自身，跳过（用于防止把文件夹拖进自己）。
+ */
+function moveItems(ids, applyTo, keepOrder = false, filterSelf = null) {
+  const items = [];
+  const seen = new Set();
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (filterSelf && id === filterSelf.id) continue;
+    const r = findById(id);
+    if (!r || r.node === root) continue;
+    if (filterSelf && isDescendant(r.node, filterSelf)) continue;
+    items.push(r);
+  }
+  if (!items.length) return 0;
+  // 从原父移除
+  for (const r of items) {
+    if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
+  }
+  // 应用
+  for (const r of items) applyTo(r.node);
+  return items.length;
+}
+
+/* ============================================================
+ *  列表栏（表头）+ splitter 拉杆
  * ============================================================ */
 const COLUMNS = [
-  { key: '__fav',  label: '',     cls: 'col-fav',    sortable: false },
-  { key: 'title',  label: '标题', cls: 'col-title',  sortable: true },
-  { key: 'url',    label: '网址', cls: 'col-url',    sortable: true },
-  { key: 'status', label: '状态', cls: 'col-status', sortable: true },
-  { key: 'tag',    label: '位置', cls: 'col-tag',    sortable: true, onlySearch: true },
-  { key: 'type',   label: '类型', cls: 'col-type',   sortable: true, onlyFolder: true },
+  { key: '__fav',  label: '',     sortable: false, always: true },
+  { key: 'title',  label: '标题', sortable: true,  always: true },
+  { key: 'url',    label: '网址', sortable: true,  always: true },
+  { key: 'status', label: '状态', sortable: true,  always: true },
+  { key: 'tag',    label: '位置', sortable: true,  onlySearch: true },
+  { key: 'type',   label: '类型', sortable: true,  onlyFolder: true },
 ];
+
+function visibleColumns() {
+  const isSearch = !!searchQuery;
+  return COLUMNS.filter(c => {
+    if (c.onlySearch && !isSearch) return false;
+    if (c.onlyFolder && isSearch) return false;
+    return true;
+  });
+}
 
 function renderListHeader() {
   const el = document.getElementById('listHeader');
@@ -543,31 +748,73 @@ function renderListHeader() {
     el.innerHTML = '';
     return;
   }
-  const isSearch = !!searchQuery;
   el.innerHTML = '';
-  for (const col of COLUMNS) {
-    if (col.onlySearch && !isSearch) continue;
-    if (col.onlyFolder && isSearch) continue;
+  const cols = visibleColumns();
+  cols.forEach((col, i) => {
     const d = document.createElement('div');
-    d.className = 'col ' + col.cls;
-    if (!col.sortable) {
-      d.textContent = col.label;
+    d.className = 'col' + (col.key === '__fav' ? ' fav-col' : '');
+    d.style.width = (colWidths[col.key] || DEFAULT_COLS[col.key] || 100) + 'px';
+    d.dataset.key = col.key;
+
+    const lbl = document.createElement('span');
+    lbl.className = 'col-label';
+    if (col.sortable && sortState.key === col.key) {
+      lbl.textContent = col.label + (sortState.dir === 1 ? ' ▲' : ' ▼');
     } else {
-      let arrow = '';
-      if (sortState.key === col.key) arrow = sortState.dir === 1 ? ' ▲' : ' ▼';
-      d.innerHTML = col.label + `<span class="arrow">${arrow}</span>`;
-      d.onclick = () => toggleSort(col.key);
+      lbl.textContent = col.label;
     }
+    d.appendChild(lbl);
+
+    if (col.sortable) d.onclick = () => toggleSort(col.key);
     el.appendChild(d);
-  }
+
+    // splitter（最后一列后不加）
+    if (i < cols.length - 1) {
+      const sp = document.createElement('div');
+      sp.className = 'splitter';
+      sp.dataset.leftKey = col.key;
+      sp.dataset.rightKey = cols[i + 1].key;
+      sp.onmousedown = (e) => beginColResize(e, col.key, cols[i + 1].key);
+      el.appendChild(sp);
+    }
+  });
 }
+
+function beginColResize(e, leftKey, rightKey) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startL = colWidths[leftKey] || DEFAULT_COLS[leftKey] || 100;
+  const startR = colWidths[rightKey] || DEFAULT_COLS[rightKey] || 100;
+  const splitter = e.currentTarget;
+  splitter.classList.add('dragging');
+  document.body.classList.add('col-resizing');
+
+  const onMove = (ev) => {
+    const dx = ev.clientX - startX;
+    const newL = Math.max(30, startL + dx);
+    const newR = Math.max(30, startR - dx);
+    colWidths[leftKey] = newL;
+    colWidths[rightKey] = newR;
+    // 实时更新表头和列表宽度
+    document.querySelectorAll(`.list-header .col[data-key="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
+    document.querySelectorAll(`.list-header .col[data-key="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
+    document.querySelectorAll(`.list-item > *[data-colkey="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
+    document.querySelectorAll(`.list-item > *[data-colkey="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
+  };
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    splitter.classList.remove('dragging');
+    document.body.classList.remove('col-resizing');
+    saveColWidths();
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
 function toggleSort(key) {
-  if (sortState.key === key) {
-    sortState.dir = -sortState.dir;
-  } else {
-    sortState.key = key;
-    sortState.dir = 1;
-  }
+  if (sortState.key === key) sortState.dir = -sortState.dir;
+  else { sortState.key = key; sortState.dir = 1; }
   renderList();
 }
 function applySort(items) {
@@ -578,27 +825,21 @@ function applySort(items) {
       case 'title': return (it.title || '').toLowerCase();
       case 'url': return (it.url || '').toLowerCase();
       case 'status': return it.linkStatus || '';
-      case 'tag': {
-        const p = findParentFolderOf(it.id);
-        return (p ? p.title : '').toLowerCase();
-      }
+      case 'tag': { const p = findParentFolderOf(it.id); return (p ? p.title : '').toLowerCase(); }
       case 'type': return it.type;
       default: return '';
     }
   };
-  const arr = items.slice();
-  arr.sort((a, b) => {
-    // 文件夹始终排前？不强制，纯按列排
+  return items.slice().sort((a, b) => {
     const va = getVal(a), vb = getVal(b);
     if (va < vb) return -1 * d;
     if (va > vb) return 1 * d;
     return 0;
   });
-  return arr;
 }
 
 /* ============================================================
- *  列表数据 + 渲染
+ *  列表渲染
  * ============================================================ */
 function getVisibleItems() {
   if (!currentFolder) return [];
@@ -607,8 +848,7 @@ function getVisibleItems() {
     const q = searchQuery.toLowerCase();
     items = items.filter(it =>
       (it.title || '').toLowerCase().includes(q) ||
-      (it.url || '').toLowerCase().includes(q)
-    );
+      (it.url || '').toLowerCase().includes(q));
   }
   return items;
 }
@@ -630,12 +870,7 @@ function renderList() {
     return;
   }
 
-  let items;
-  if (isSearch) {
-    items = currentSearchResults.slice();
-  } else {
-    items = getVisibleItems();
-  }
+  let items = isSearch ? currentSearchResults.slice() : getVisibleItems();
   items = applySort(items);
 
   titleEl.textContent = isSearch
@@ -650,11 +885,12 @@ function renderList() {
 
   listEl.innerHTML = '';
   if (!items.length) {
-    listEl.innerHTML = '<div class="empty">' +
-      (isSearch ? '没有匹配的书签' : '这个文件夹是空的') + '</div>';
+    listEl.innerHTML = '<div class="empty">' + (isSearch ? '没有匹配的书签' : '这个文件夹是空的') + '</div>';
     updateSelectionInfo();
     return;
   }
+
+  const cols = visibleColumns();
 
   items.forEach((it, idx) => {
     const row = document.createElement('div');
@@ -662,60 +898,43 @@ function renderList() {
     if (selectedIds.has(it.id)) row.classList.add('selected');
     row.dataset.id = it.id;
 
-    // favicon 列
-    const fav = document.createElement('img');
-    fav.className = 'favicon';
-    if (it.type === 'bookmark') {
-      fav.src = it.iconUri || (it.url ? faviconUrl(it.url) : '');
-      fav.onerror = () => { fav.style.visibility = 'hidden'; };
-    } else {
-      // 文件夹用 emoji
-      fav.style.visibility = 'hidden';
-    }
-    row.appendChild(fav);
-
-    // 标题列
-    const title = document.createElement('span');
-    title.className = 'title';
-    title.textContent = (it.type === 'folder' ? '📁 ' : '') + (it.title || '(未命名)');
-    row.appendChild(title);
-
-    // 网址列
-    const url = document.createElement('span');
-    url.className = 'url';
-    url.textContent = it.type === 'folder'
-      ? `文件夹 · ${countBookmarks(it)} 个书签`
-      : it.url;
-    row.appendChild(url);
-
-    // 状态列
-    const st = document.createElement('span');
-    st.className = 'status';
-    if (it.type === 'bookmark' && it.linkStatus) {
-      st.classList.add(it.linkStatus);
-      st.textContent = it.linkStatus === 'ok' ? '可用'
-                     : it.linkStatus === 'bad' ? '失效' : '检查中';
-    } else {
-      st.textContent = '';
-    }
-    row.appendChild(st);
-
-    // 位置列（仅搜索视图显示）
-    if (isSearch) {
-      const tag = document.createElement('span');
-      tag.className = 'tag';
-      const p = findParentFolderOf(it.id);
-      tag.textContent = p ? p.title : '';
-      row.appendChild(tag);
-    }
-
-    // 类型列（仅文件夹视图显示）
-    if (!isSearch) {
-      const ty = document.createElement('span');
-      ty.className = 'type';
-      ty.textContent = it.type === 'folder' ? '文件夹' : '书签';
-      row.appendChild(ty);
-    }
+    // 用可见列渲染每一格
+    cols.forEach(col => {
+      const cell = document.createElement('span');
+      cell.dataset.colkey = col.key;
+      cell.style.width = (colWidths[col.key] || DEFAULT_COLS[col.key] || 100) + 'px';
+      if (col.key === '__fav') {
+        cell.classList.add('favicon');
+        if (it.type === 'bookmark') {
+          const img = document.createElement('img');
+          img.src = it.iconUri || (it.url ? faviconUrl(it.url) : '');
+          img.style.width = '16px'; img.style.height = '16px';
+          img.onerror = () => { img.style.visibility = 'hidden'; };
+          cell.appendChild(img);
+        }
+      } else if (col.key === 'title') {
+        cell.classList.add('title');
+        cell.textContent = (it.type === 'folder' ? '📁 ' : '') + (it.title || '(未命名)');
+      } else if (col.key === 'url') {
+        cell.classList.add('url');
+        cell.textContent = it.type === 'folder'
+          ? `文件夹 · ${countBookmarks(it)} 个书签` : it.url;
+      } else if (col.key === 'status') {
+        cell.classList.add('status');
+        if (it.type === 'bookmark' && it.linkStatus) {
+          cell.classList.add(it.linkStatus);
+          cell.textContent = it.linkStatus === 'ok' ? '可用' : it.linkStatus === 'bad' ? '失效' : '检查中';
+        }
+      } else if (col.key === 'tag') {
+        cell.classList.add('tag');
+        const p = findParentFolderOf(it.id);
+        cell.textContent = p ? p.title : '';
+      } else if (col.key === 'type') {
+        cell.classList.add('type');
+        cell.textContent = it.type === 'folder' ? '文件夹' : '书签';
+      }
+      row.appendChild(cell);
+    });
 
     row.onclick = (e) => {
       if (e.ctrlKey || e.metaKey) {
@@ -737,51 +956,43 @@ function renderList() {
       else {
         currentFolder = it;
         selectedIds.clear();
-        searchQuery = '';
-        document.getElementById('searchBox').value = '';
+        searchQuery = ''; document.getElementById('searchBox').value = '';
         sortState = { key: null, dir: 1 };
-        renderTree();
-        renderList();
+        renderTree(); renderList();
       }
     };
 
     row.oncontextmenu = (e) => {
       e.preventDefault();
       if (!selectedIds.has(it.id)) {
-        selectedIds.clear();
-        selectedIds.add(it.id);
-        renderList();
+        selectedIds.clear(); selectedIds.add(it.id); renderList();
       }
       showContextMenu(e.clientX, e.clientY, it);
     };
 
-    // 拖拽
     row.draggable = true;
-    row.ondragstart = (e) => {
-      e.dataTransfer.setData('text/plain', it.id);
-      e.dataTransfer.effectAllowed = 'move';
-      row.classList.add('dragging');
-    };
-    row.ondragend = () => {
-      row.classList.remove('dragging');
-      document.querySelectorAll('.drop-line').forEach(el => el.remove());
-    };
+    row.ondragstart = (e) => { startDrag(e, it.id); e.dataTransfer.effectAllowed = 'move'; };
+    row.ondragend = clearDragStyles;
+
     row.ondragover = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
       const rect = row.getBoundingClientRect();
-      const before = e.clientY < rect.top + rect.height / 2;
-      document.querySelectorAll('.drop-line').forEach(el => el.remove());
+      const rel = (e.clientY - rect.top) / rect.height;
+      clearDropLine();
       const line = document.createElement('div');
       line.className = 'drop-line';
-      if (before) row.parentNode.insertBefore(line, row);
+      if (rel < 0.5) row.parentNode.insertBefore(line, row);
       else row.parentNode.insertBefore(line, row.nextSibling);
     };
     row.ondrop = (e) => {
       e.preventDefault();
-      const srcId = e.dataTransfer.getData('text/plain');
-      const before = isBeforeDrop(row, e.clientY);
-      reorderNode(srcId, it.id, before);
+      e.stopPropagation();
+      const ids = getDragIds(e);
+      const rect = row.getBoundingClientRect();
+      const before = (e.clientY - rect.top) / rect.height < 0.5;
+      reorderMulti(ids, it.id, before);
     };
 
     listEl.appendChild(row);
@@ -790,63 +1001,67 @@ function renderList() {
   updateSelectionInfo();
 }
 
-let lastClickedIdx = -1;
-
-function isBeforeDrop(row, clientY) {
-  const rect = row.getBoundingClientRect();
-  return clientY < rect.top + rect.height / 2;
+function clearDropLine() {
+  document.querySelectorAll('.drop-line').forEach(el => el.remove());
 }
+
+let lastClickedIdx = -1;
 function faviconUrl(url) {
   try { return 'https://www.google.com/s2/favicons?domain=' + new URL(url).hostname + '&sz=32'; }
   catch { return ''; }
 }
 
-/* ============================================================
- *  操作：移动 / 排序 / 删除 / 新建
- * ============================================================ */
-function moveNode(srcId, targetFolderId) {
-  if (srcId === targetFolderId) return;
-  const src = findById(srcId);
-  const tgt = findById(targetFolderId);
-  if (!src || !tgt) return;
-  if (tgt.node.type !== 'folder') return;
-  if (isDescendant(src.node, tgt.node)) { alert('不能把文件夹移动到它自己的子级'); return; }
-  const oldParent = src.parent;
-  oldParent.children = oldParent.children.filter(c => c.id !== srcId);
-  tgt.node.children.push(src.node);
-  renderTree();
-  if (searchQuery) doSearch(searchQuery); else renderList();
-  setStatus('已移动「' + src.node.title + '」到「' + tgt.node.title + '」');
-}
-function reorderNode(srcId, targetId, before) {
-  const src = findById(srcId);
+/* 列表内排序（含多选）*/
+function reorderMulti(ids, targetId, before) {
   const tgt = findById(targetId);
-  if (!src || !tgt) return;
-  if (src.node === tgt.node) return;
-  if (isDescendant(src.node, tgt.node)) { alert('不能移动到自己的子级'); return; }
-  src.parent.children = src.parent.children.filter(c => c.id !== srcId);
+  if (!tgt) return;
   const targetParent = tgt.parent || root;
-  const idx = targetParent.children.findIndex(c => c.id === targetId);
-  if (idx === -1) targetParent.children.push(src.node);
-  else targetParent.children.splice(before ? idx : idx + 1, 0, src.node);
-  // 手动排序后清空列排序，避免混淆
+
+  const items = [];
+  const seen = new Set();
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (id === targetId) continue;
+    const r = findById(id);
+    if (!r || r.node === root) continue;
+    if (isDescendant(r.node, tgt.node)) continue; // 不能把父拖进子
+    items.push(r);
+  }
+  if (!items.length) return;
+
+  // 记录目标锚点
+  const beforeId = before ? targetId : (targetParent.children[targetParent.children.findIndex(c => c.id === targetId) + 1]?.id || null);
+
+  // 从原父移除
+  for (const r of items) {
+    if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
+  }
+  // 插回目标父
+  let idx = beforeId ? targetParent.children.findIndex(c => c.id === beforeId) : targetParent.children.length;
+  if (idx === -1) idx = targetParent.children.length;
+  targetParent.children.splice(idx, 0, ...items.map(r => r.node));
+
   sortState = { key: null, dir: 1 };
   renderTree(); renderList();
-  setStatus('已重新排序');
+  if (searchQuery) doSearch(searchQuery);
+  setStatus(`已移动 ${items.length} 项`);
 }
+
+/* ============================================================
+ *  删除 / 新建
+ * ============================================================ */
 function deleteSelected() {
   if (!selectedIds.size) { alert('没有选中任何项'); return; }
   if (!confirm('确定删除选中的 ' + selectedIds.size + ' 项？')) return;
   const ids = [...selectedIds];
   for (const id of ids) {
     const r = findById(id);
-    if (r && r.parent && r.node !== root) {
-      r.parent.children = r.parent.children.filter(c => c.id !== id);
-    }
+    if (r && r.parent && r.node !== root) r.parent.children = r.parent.children.filter(c => c.id !== id);
   }
   selectedIds.clear();
-  renderTree();
-  if (searchQuery) doSearch(searchQuery); else renderList();
+  renderTree(); renderList();
+  if (searchQuery) doSearch(searchQuery);
   setStatus('已删除 ' + ids.length + ' 项');
 }
 function createFolder() {
@@ -854,14 +1069,13 @@ function createFolder() {
   const parent = currentFolder || root;
   const name = prompt('新文件夹名称：', '新建文件夹');
   if (name === null) return;
-  const f = newFolder(name.trim() || '新建文件夹');
-  parent.children.unshift(f);
+  parent.children.unshift(newFolder(name.trim() || '新建文件夹'));
   renderTree(); renderList();
   setStatus('已创建文件夹');
 }
 
 /* ============================================================
- *  排序（工具栏）
+ *  工具栏排序
  * ============================================================ */
 function sortChildren(folder, key) {
   folder.children.sort((a, b) => {
@@ -888,31 +1102,27 @@ function sortCurrentDate() {
 }
 
 /* ============================================================
- *  去重（带完整日志）
+ *  去重（带日志）
  * ============================================================ */
 function dedup() {
   if (!root) return;
   const scope = currentFolder || root;
-  const seen = new Map();      // urlKey -> { node, path }
-  const removed = [];          // { title, url, path, keptTitle, keptPath }
+  const seen = new Map();
+  const removed = [];
 
   function traverse(folder, pathArr) {
     const keep = [];
     for (const c of folder.children) {
-      if (c.type === 'folder') {
-        traverse(c, [...pathArr, c.title]);
-        keep.push(c);
-      } else {
+      if (c.type === 'folder') { traverse(c, [...pathArr, c.title]); keep.push(c); }
+      else {
         const key = (c.url || '').trim().toLowerCase();
         if (!key) { keep.push(c); continue; }
         if (seen.has(key)) {
           const first = seen.get(key);
           removed.push({
-            title: c.title,
-            url: c.url,
+            title: c.title, url: c.url,
             path: [...pathArr, folder.title].join(' / '),
-            keptTitle: first.node.title,
-            keptPath: first.path,
+            keptTitle: first.node.title, keptPath: first.path,
           });
         } else {
           seen.set(key, { node: c, path: [...pathArr, folder.title].join(' / ') });
@@ -929,25 +1139,22 @@ function dedup() {
 
   if (!removed.length) {
     setStatus('没有发现重复书签');
-    showModal('去重结果', `
-      <p>范围：<b>${esc(scope.title)}</b></p>
-      <p style="color:var(--muted); margin-top:8px;">没有发现重复书签。</p>
-    `);
+    showModal('去重结果', `<p>范围：<b>${esc(scope.title)}</b></p><p style="color:var(--muted); margin-top:8px;">没有发现重复书签。</p>`);
     return;
   }
 
   setStatus('去重完成：移除 ' + removed.length + ' 个重复书签');
 
-  // 生成 log 文本
   const now = new Date().toLocaleString();
-  const logLines = [];
-  logLines.push(`# 书签去重日志`);
-  logLines.push(`# 生成时间: ${now}`);
-  logLines.push(`# 工具版本: v${APP_VERSION}`);
-  logLines.push(`# 范围: ${scope.title}`);
-  logLines.push(`# 保留策略: 每个 URL 保留遍历时遇到的第一个`);
-  logLines.push(`# 重复数: ${removed.length}`);
-  logLines.push('');
+  const logLines = [
+    `# 书签去重日志`,
+    `# 生成时间: ${now}`,
+    `# 工具版本: v${APP_VERSION}`,
+    `# 范围: ${scope.title}`,
+    `# 保留策略: 每个 URL 保留遍历时遇到的第一个`,
+    `# 重复数: ${removed.length}`,
+    '',
+  ];
   removed.forEach((r, i) => {
     logLines.push(`[${i + 1}] 已删除`);
     logLines.push(`    标题: ${r.title}`);
@@ -958,27 +1165,22 @@ function dedup() {
     logLines.push('');
   });
   const logText = logLines.join('\n');
-
-  // 转义 HTML
-  const escLog = logText
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escLog = logText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   showModal(`去重结果（共删除 ${removed.length} 条）`, `
     <p style="margin-bottom:10px;">范围：<b>${esc(scope.title)}</b></p>
-    <div class="log-box" id="dedupLog">${escLog}</div>
+    <div class="log-box">${escLog}</div>
   `, [
     { label: '复制日志', action: () => {
         navigator.clipboard.writeText(logText).then(
           () => setStatus('日志已复制到剪贴板'),
-          () => alert('复制失败')
-        );
+          () => alert('复制失败'));
       }},
     { label: '下载 .log', action: () => {
         const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
-        a.download = `dedup_${ts}.log`;
+        a.download = `dedup_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.log`;
         a.click();
         URL.revokeObjectURL(a.href);
       }},
@@ -995,21 +1197,18 @@ function openBatchEdit() {
   const all = ids.length ? ids : listItems.map(i => i.id);
   showModal('批量编辑', `
     <p style="color:var(--muted); font-size:12px; margin-bottom:10px;">
-      作用范围：${ids.length ? '当前选中的 ' + ids.length + ' 项' : '当前视图可见的 ' + all.length + ' 项'}（文件夹会被忽略）
+      作用范围：${ids.length ? '选中的 ' + ids.length + ' 项' : '当前视图可见的 ' + all.length + ' 项'}（文件夹忽略）
     </p>
-    <label>查找（URL 或标题中的文本）</label>
-    <input type="text" id="be-find" placeholder="例如 http://">
-    <label>替换为</label>
-    <input type="text" id="be-replace" placeholder="例如 https://">
-    <label>URL 前缀（可选，会加在 URL 最前面）</label>
-    <input type="text" id="be-prefix" placeholder="例如 https://web.archive.org/">
+    <label>查找</label><input type="text" id="be-find" placeholder="http://">
+    <label>替换为</label><input type="text" id="be-replace" placeholder="https://">
+    <label>URL 前缀</label><input type="text" id="be-prefix" placeholder="https://web.archive.org/">
     <label>标题前缀 / 后缀</label>
     <div style="display:flex; gap:8px;">
-      <input type="text" id="be-title-prefix" placeholder="标题前缀" style="flex:1;">
-      <input type="text" id="be-title-suffix" placeholder="标题后缀" style="flex:1;">
+      <input type="text" id="be-title-prefix" placeholder="前缀" style="flex:1;">
+      <input type="text" id="be-title-suffix" placeholder="后缀" style="flex:1;">
     </div>
   `, [
-    { label: '取消', action: () => closeModal() },
+    { label: '取消', action: closeModal },
     { label: '应用', primary: true, action: () => {
       const find = document.getElementById('be-find').value;
       const replace = document.getElementById('be-replace').value;
@@ -1038,36 +1237,29 @@ function openBatchEdit() {
 }
 
 /* ============================================================
- *  失效链接检测
+ *  失效检测
  * ============================================================ */
 async function checkLinks() {
   if (!currentFolder && !searchQuery) return;
-  const items = (searchQuery ? currentSearchResults : getVisibleItems())
-    .filter(i => i.type === 'bookmark');
+  const items = (searchQuery ? currentSearchResults : getVisibleItems()).filter(i => i.type === 'bookmark');
   if (!items.length) { setStatus('当前视图没有书签'); return; }
-  if (items.length > 200 && !confirm(`当前有 ${items.length} 个书签，检测可能较慢且部分站点会拦截。继续？`)) return;
+  if (items.length > 200 && !confirm(`当前有 ${items.length} 个书签，检测可能较慢。继续？`)) return;
 
   setStatus('开始检测 ' + items.length + ' 个链接...');
-  let done = 0, ok = 0, bad = 0;
+  let done = 0, ok = 0, bad = 0, idx = 0;
   const CONCURRENCY = 8;
-  let idx = 0;
 
   async function worker() {
     while (idx < items.length) {
-      const i = idx++;
-      const it = items[i];
+      const it = items[idx++];
       it.linkStatus = 'pending';
       try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 8000);
         await fetch(it.url, { method: 'GET', mode: 'no-cors', signal: ctrl.signal, cache: 'no-store' });
         clearTimeout(timer);
-        it.linkStatus = 'ok';
-        ok++;
-      } catch (e) {
-        it.linkStatus = 'bad';
-        bad++;
-      }
+        it.linkStatus = 'ok'; ok++;
+      } catch (e) { it.linkStatus = 'bad'; bad++; }
       done++;
       if (done % 5 === 0 || done === items.length) {
         setStatus(`检测进度 ${done}/${items.length}（可用 ${ok}，疑似失效 ${bad}）`);
@@ -1077,23 +1269,17 @@ async function checkLinks() {
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   if (searchQuery) doSearch(searchQuery); else renderList();
-  setStatus(`检测完成：可用 ${ok}，疑似失效 ${bad}（浏览器限制，结果仅供参考）`);
+  setStatus(`检测完成：可用 ${ok}，疑似失效 ${bad}（浏览器限制，仅供参考）`);
 }
 
 /* ============================================================
  *  搜索
  * ============================================================ */
 let currentSearchResults = [];
-
 function doSearch(q) {
   searchQuery = q.trim();
-  if (!searchQuery) {
-    currentSearchResults = [];
-    renderList();
-    return;
-  }
+  if (!searchQuery) { currentSearchResults = []; renderList(); return; }
   if (!root) return;
-
   const results = [];
   const ql = searchQuery.toLowerCase();
   walkAll(root, (n) => {
@@ -1107,60 +1293,39 @@ function doSearch(q) {
 }
 
 /* ============================================================
- *  框选（左键拉框）
+ *  框选
  * ============================================================ */
 function setupMarquee() {
   const listEl = document.getElementById('list');
   const box = document.getElementById('marquee');
-  let dragging = false;
-  let startX = 0, startY = 0;
-  let additive = false;   // ctrl 按下时为追加
+  let dragging = false, startX = 0, startY = 0, additive = false;
 
   listEl.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    // 只在空白处开始（点在 item 上不触发框选）
     if (e.target.closest('.list-item')) return;
-
     dragging = true;
     additive = e.ctrlKey || e.metaKey;
-    startX = e.clientX;
-    startY = e.clientY;
+    startX = e.clientX; startY = e.clientY;
     box.style.display = 'block';
-    box.style.left = startX + 'px';
-    box.style.top = startY + 'px';
-    box.style.width = '0px';
-    box.style.height = '0px';
-
-    if (!additive) {
-      selectedIds.clear();
-      updateSelectionInfo();
-    }
-    // 阻止文本选择
+    box.style.left = startX + 'px'; box.style.top = startY + 'px';
+    box.style.width = '0px'; box.style.height = '0px';
+    if (!additive) { selectedIds.clear(); updateSelectionInfo(); }
     e.preventDefault();
   });
-
   document.addEventListener('mousemove', (e) => {
     if (!dragging) return;
-    const x1 = Math.min(startX, e.clientX);
-    const y1 = Math.min(startY, e.clientY);
-    const x2 = Math.max(startX, e.clientX);
-    const y2 = Math.max(startY, e.clientY);
-    box.style.left = x1 + 'px';
-    box.style.top = y1 + 'px';
-    box.style.width = (x2 - x1) + 'px';
-    box.style.height = (y2 - y1) + 'px';
-
-    // 实时高亮
+    const x1 = Math.min(startX, e.clientX), y1 = Math.min(startY, e.clientY);
+    const x2 = Math.max(startX, e.clientX), y2 = Math.max(startY, e.clientY);
+    box.style.left = x1 + 'px'; box.style.top = y1 + 'px';
+    box.style.width = (x2 - x1) + 'px'; box.style.height = (y2 - y1) + 'px';
     const rect = { left: x1, top: y1, right: x2, bottom: y2 };
     const rows = listEl.querySelectorAll('.list-item');
     const newSel = additive ? new Set(selectedIds) : new Set();
     rows.forEach(r => {
       const rr = r.getBoundingClientRect();
-      const hit = !(rr.right < rect.left || rr.left > rect.right ||
-                    rr.bottom < rect.top || rr.top > rect.bottom);
+      const hit = !(rr.right < rect.left || rr.left > rect.right || rr.bottom < rect.top || rr.top > rect.bottom);
       if (hit) newSel.add(r.dataset.id);
     });
-    // 只更新 class，避免整列表重渲
     rows.forEach(r => {
       if (newSel.has(r.dataset.id)) r.classList.add('selected');
       else r.classList.remove('selected');
@@ -1168,7 +1333,6 @@ function setupMarquee() {
     selectedIds = newSel;
     updateSelectionInfo();
   });
-
   document.addEventListener('mouseup', () => {
     if (!dragging) return;
     dragging = false;
@@ -1211,10 +1375,7 @@ function showContextMenu(x, y, node) {
     });
     add('📁 在此新建文件夹', () => {
       const name = prompt('新文件夹名称：', '新建文件夹');
-      if (name !== null) {
-        node.children.unshift(newFolder(name.trim() || '新建文件夹'));
-        renderTree(); renderList();
-      }
+      if (name !== null) { node.children.unshift(newFolder(name.trim() || '新建文件夹')); renderTree(); renderList(); }
     });
     sep();
     add('🔤 A→Z 排序', () => { sortChildren(node, 'az'); renderTree(); renderList(); });
@@ -1229,19 +1390,16 @@ function showContextMenu(x, y, node) {
       if (!confirm('确定删除「' + node.title + '」？')) return;
       const r = findById(node.id);
       if (r && r.parent) r.parent.children = r.parent.children.filter(c => c.id !== node.id);
-      renderTree();
-      if (searchQuery) doSearch(searchQuery); else renderList();
+      renderTree(); if (searchQuery) doSearch(searchQuery); else renderList();
     }, true);
   }
-  menu.style.left = x + 'px';
-  menu.style.top = y + 'px';
-  menu.style.display = 'block';
+  menu.style.left = x + 'px'; menu.style.top = y + 'px'; menu.style.display = 'block';
 }
 function hideContextMenu() { document.getElementById('ctxMenu').style.display = 'none'; }
 document.addEventListener('click', hideContextMenu);
 
 /* ============================================================
- *  弹窗
+ *  弹窗 / 关于 / 状态栏
  * ============================================================ */
 function showModal(title, bodyHtml, buttons = [{ label: '关闭', action: closeModal }]) {
   const box = document.getElementById('modalBox');
@@ -1259,38 +1417,29 @@ function showModal(title, bodyHtml, buttons = [{ label: '关闭', action: closeM
   document.getElementById('modalMask').classList.add('show');
 }
 function closeModal() { document.getElementById('modalMask').classList.remove('show'); }
-document.getElementById('modalMask').onclick = (e) => {
-  if (e.target.id === 'modalMask') closeModal();
-};
+document.getElementById('modalMask').onclick = (e) => { if (e.target.id === 'modalMask') closeModal(); };
 
-/* ============================================================
- *  关于
- * ============================================================ */
 function showAbout() {
   showModal('关于', `
     <p style="font-size:14px; margin-bottom:8px;"><b>书签管理器 Pro</b> <span style="color:var(--accent);">v${APP_VERSION}</span></p>
     <p style="color:var(--muted); font-size:12px; line-height:1.7;">
-      一个单文件、零依赖的 Chrome 书签整理工具。<br>
-      导入 → 可视化整理 → 导出，再导回 Chrome。
+      单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.1.0</b> · 新增列表栏排序、框选、去重日志，修复搜索全选<br>
+      <b>v1.2.0</b> · 列表栏可拖拽 splitter（记忆列宽）、多选拖拽、树同级插入、drop 阈值优化<br>
+      <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志；修复搜索全选<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
     </p>
   `);
 }
 
-/* ============================================================
- *  状态栏
- * ============================================================ */
 function setStatus(s) { document.getElementById('status').textContent = s; }
 function updateSelectionInfo() {
-  const el = document.getElementById('selectionInfo');
-  el.textContent = selectedIds.size ? `已选中 ${selectedIds.size} 项` : '';
+  document.getElementById('selectionInfo').textContent = selectedIds.size ? `已选中 ${selectedIds.size} 项` : '';
 }
 
 /* ============================================================
- *  导入：合并 / 替换
+ *  导入
  * ============================================================ */
 function importFile(file) {
   const reader = new FileReader();
@@ -1298,14 +1447,11 @@ function importFile(file) {
     try {
       const newRoot = parseBookmarks(e.target.result);
       if (!root) {
-        root = newRoot;
-        currentFolder = root;
+        root = newRoot; currentFolder = root;
         renderTree(); renderList();
         setStatus('已导入 ' + countBookmarks(root) + ' 个书签');
       } else {
-        showModal('导入方式', `
-          <p>当前已有书签。你希望如何处理新导入的文件？</p>
-        `, [
+        showModal('导入方式', `<p>当前已有书签。选择处理方式：</p>`, [
           { label: '取消', action: closeModal },
           { label: '替换现有', action: () => {
               root = newRoot; currentFolder = root;
@@ -1322,9 +1468,7 @@ function importFile(file) {
             }},
         ]);
       }
-    } catch (err) {
-      alert('解析失败：' + err.message);
-    }
+    } catch (err) { alert('解析失败：' + err.message); }
   };
   reader.readAsText(file, 'utf-8');
 }
@@ -1347,34 +1491,25 @@ document.getElementById('btnCheck').onclick = checkLinks;
 document.getElementById('btnBatch').onclick = openBatchEdit;
 document.getElementById('btnAbout').onclick = showAbout;
 
-// 修复：全选按钮 —— 搜索态全选搜索结果的 id，普通态全选当前文件夹
 document.getElementById('btnSelectAll').onclick = () => {
   const items = searchQuery ? currentSearchResults : getVisibleItems();
-  const allSelected = items.length > 0 && items.every(i => selectedIds.has(i.id));
-  if (allSelected) {
-    selectedIds.clear();
-  } else {
-    items.forEach(i => selectedIds.add(i.id));
-  }
-  if (searchQuery) doSearch(searchQuery);
-  else renderList();
+  const allSel = items.length > 0 && items.every(i => selectedIds.has(i.id));
+  if (allSel) selectedIds.clear();
+  else items.forEach(i => selectedIds.add(i.id));
+  if (searchQuery) doSearch(searchQuery); else renderList();
 };
-
 document.getElementById('searchBox').oninput = (e) => doSearch(e.target.value);
 
-// 键盘快捷键
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'Delete') deleteSelected();
   if (e.ctrlKey && e.key === 'a') {
     e.preventDefault();
-    const items = searchQuery ? currentSearchResults : getVisibleItems();
-    items.forEach(i => selectedIds.add(i.id));
+    (searchQuery ? currentSearchResults : getVisibleItems()).forEach(i => selectedIds.add(i.id));
     if (searchQuery) doSearch(searchQuery); else renderList();
   }
   if (e.key === 'F2' && selectedIds.size === 1) {
-    const id = [...selectedIds][0];
-    const r = findById(id);
+    const r = findById([...selectedIds][0]);
     if (r) {
       const name = prompt('重命名：', r.node.title);
       if (name !== null) {
@@ -1383,18 +1518,16 @@ document.addEventListener('keydown', (e) => {
       }
     }
   }
-  if (e.key === 'Escape') {
-    hideContextMenu();
-    closeModal();
-  }
+  if (e.key === 'Escape') { hideContextMenu(); closeModal(); }
 });
 
-// 支持直接拖入 html 文件到窗口
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (file) importFile(file);
+  // 只在拖入外部文件时生效（内部拖拽的 dataTransfer 无 files）
+  if (e.dataTransfer.files && e.dataTransfer.files.length) {
+    e.preventDefault();
+    importFile(e.dataTransfer.files[0]);
+  }
 });
 
 // 初始化
