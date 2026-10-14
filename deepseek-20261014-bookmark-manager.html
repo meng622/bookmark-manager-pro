@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro</title>
+<title>书签管理器 Pro v1.0.0</title>
+<!-- 书签管理器 Pro v1.0.0 | 2026-10-14 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -164,6 +165,10 @@
   <div class="group" style="flex:1; border:none;">
     <input type="search" id="searchBox" placeholder="🔍 搜索标题或网址..." style="flex:1; min-width:150px;">
   </div>
+  <div class="group" style="border:none; padding-right:0;">
+    <button id="btnAbout">ℹ️ 关于</button>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.0.0</span>
+  </div>
 </div>
 
 <div class="main">
@@ -198,6 +203,11 @@
 </div>
 
 <script>
+/* ============================================================
+ *  版本信息
+ * ============================================================ */
+const APP_VERSION = '1.0.0';
+
 /* ============================================================
  *  数据模型
  * ============================================================ */
@@ -687,6 +697,8 @@ function moveNode(srcId, targetFolderId) {
   // 加入目标
   tgt.node.children.push(src.node);
   renderTree(); renderList();
+  // 如果当前处于搜索状态，重跑搜索让结果同步
+  if (searchQuery) doSearch(searchQuery);
   setStatus('已移动「' + src.node.title + '」到「' + tgt.node.title + '」');
 }
 
@@ -703,7 +715,7 @@ function reorderNode(srcId, targetId, before, visibleItems) {
   const targetParent = tgt.parent || root;
   const idx = targetParent.children.findIndex(c => c.id === targetId);
   if (idx === -1) { targetParent.children.push(src.node); }
-  else targetParent.children.splice(before ? idx : idx + 1, 0, src.node);
+  else { targetParent.children.splice(before ? idx : idx + 1, 0, src.node); }
 
   renderTree(); renderList();
   setStatus('已重新排序');
@@ -893,8 +905,8 @@ async function checkLinks() {
 function doSearch(q) {
   searchQuery = q.trim();
   if (!searchQuery) { renderList(); return; }
-  // 搜索结果：跨所有文件夹
   if (!root) return;
+
   const results = [];
   const ql = searchQuery.toLowerCase();
   walkAll(root, (n) => {
@@ -903,16 +915,19 @@ function doSearch(q) {
       results.push(n);
     }
   });
+
   const listEl = document.getElementById('list');
   const titleEl = document.getElementById('folderTitle');
   const pathEl = document.getElementById('folderPath');
   titleEl.textContent = `搜索结果：${results.length} 条`;
   pathEl.textContent = `关键词 "${searchQuery}"`;
   listEl.innerHTML = '';
+
   if (!results.length) {
     listEl.innerHTML = '<div class="empty">没有匹配的书签</div>';
     return;
   }
+
   results.forEach(it => {
     const parent = findParentFolderOf(it.id);
     const row = document.createElement('div');
@@ -949,6 +964,16 @@ function doSearch(q) {
       selectedIds.clear(); selectedIds.add(it.id);
       showContextMenu(e.clientX, e.clientY, it);
     };
+
+    // 让搜索结果也能拖拽到左侧文件夹
+    row.draggable = true;
+    row.ondragstart = (e) => {
+      e.dataTransfer.setData('text/plain', it.id);
+      e.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    };
+    row.ondragend = () => row.classList.remove('dragging');
+
     listEl.appendChild(row);
   });
 }
@@ -1039,6 +1064,22 @@ document.getElementById('modalMask').onclick = (e) => {
 };
 
 /* ============================================================
+ *  关于
+ * ============================================================ */
+function showAbout() {
+  showModal('关于', `
+    <p style="font-size:14px; margin-bottom:8px;"><b>书签管理器 Pro</b> <span style="color:var(--accent);">v${APP_VERSION}</span></p>
+    <p style="color:var(--muted); font-size:12px; line-height:1.7;">
+      一个单文件、零依赖的 Chrome 书签整理工具。<br>
+      导入 → 可视化整理 → 导出，再导回 Chrome。
+    </p>
+    <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
+      v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
+    </p>
+  `);
+}
+
+/* ============================================================
  *  状态栏
  * ============================================================ */
 function setStatus(s) { document.getElementById('status').textContent = s; }
@@ -1103,6 +1144,7 @@ document.getElementById('btnSortDate').onclick = sortCurrentDate;
 document.getElementById('btnDedup').onclick = dedup;
 document.getElementById('btnCheck').onclick = checkLinks;
 document.getElementById('btnBatch').onclick = openBatchEdit;
+document.getElementById('btnAbout').onclick = showAbout;
 document.getElementById('btnSelectAll').onclick = () => {
   const items = getVisibleItems();
   const allSelected = items.every(i => selectedIds.has(i.id));
@@ -1140,6 +1182,7 @@ document.addEventListener('drop', (e) => {
 });
 
 // 初始渲染
+document.getElementById('version').textContent = 'v' + APP_VERSION;
 renderTree();
 renderList();
 </script>
