@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.2.1</title>
-<!-- 书签管理器 Pro v1.2.1 | 2026-10-14 -->
+<title>书签管理器 Pro v1.3.0</title>
+<!-- 书签管理器 Pro v1.3.0 | 2026-10-14 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -49,6 +49,13 @@
     padding: 8px 10px; border-bottom: 1px solid var(--border);
     font-weight: 600; display: flex; justify-content: space-between; align-items: center;
   }
+  .sidebar-header .left { display: flex; align-items: center; gap: 6px; }
+  .sidebar-header .count { color: var(--muted); font-weight: 400; font-size: 11px; }
+  .fold-btn {
+    background: transparent; border: 1px solid var(--border); padding: 1px 6px;
+    font-size: 11px; border-radius: 4px; color: var(--muted);
+  }
+  .fold-btn:hover { background: var(--accent); color: #fff; }
   .tree { flex: 1; overflow-y: auto; padding: 6px; }
   .tree-node { user-select: none; }
   .tree-row {
@@ -82,7 +89,7 @@
   }
   .list-header .col {
     display: flex; align-items: center; gap: 3px; cursor: pointer;
-    padding: 0 6px; overflow: hidden; white-space: nowrap;
+    padding: 0 4px; overflow: hidden; white-space: nowrap;
     position: relative; flex-shrink: 0;
   }
   .list-header .col .col-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
@@ -106,27 +113,30 @@
 
   .list { flex: 1; overflow-y: auto; padding: 6px; position: relative; }
   .list-item {
-    display: flex; align-items: center; padding: 6px 0;
+    display: flex; align-items: center; padding: 4px 0;
     border-radius: 5px; cursor: pointer; margin-bottom: 1px;
     user-select: none;
   }
   .list-item:hover { background: var(--panel2); }
   .list-item.selected { background: var(--accent); color: #fff; }
-  .list-item > span, .list-item > img { flex-shrink: 0; padding: 0 6px; }
-  .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; margin: 0 6px; }
+  .list-item > span, .list-item > img { flex-shrink: 0; padding: 0 3px; }
+  .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; margin: 0 3px; }
   .list-item .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item .url { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item.selected .url { color: #e0e0e0; }
-  .list-item .status { text-align: center; font-size: 11px; border-radius: 8px; padding: 1px 6px; margin: 0 6px; }
+  .list-item .status { text-align: center; font-size: 11px; border-radius: 8px; padding: 1px 6px; margin: 0 3px; }
   .list-item.selected .status { background: rgba(255,255,255,.2) !important; color: #fff !important; }
   .status.ok { background: rgba(158,206,106,.2); color: var(--ok); }
   .status.bad { background: rgba(247,118,142,.2); color: var(--danger); }
   .status.pending { background: rgba(224,175,104,.2); color: var(--warn); }
-  .list-item .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
+  .list-item .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 3px; }
   .list-item.selected .tag { background: rgba(255,255,255,.2); color: #fff; }
-  .list-item .type { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .list-item.selected .type { color: #fff; }
-  .drop-line { height: 2px; background: var(--accent); margin: 2px 0; border-radius: 1px; }
+  .list-item .date { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list-item.selected .date { color: #e0e0e0; }
+  /* 列表行 drop 视觉 */
+  .list-item.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
+  .list-item.drop-after  { box-shadow: inset 0 -2px 0 0 var(--accent); }
+  .list-item.drop-into   { background: var(--accent2); color: #fff; }
   .dragging { opacity: .4; }
 
   .marquee {
@@ -190,6 +200,7 @@
   <div class="group">
     <button class="primary" id="btnImport">📂 导入书签</button>
     <button id="btnExport">💾 导出书签</button>
+    <button id="btnExportSelected">💾 导出选中</button>
     <input type="file" id="fileInput" accept=".html,.htm" hidden>
   </div>
   <div class="group">
@@ -197,11 +208,7 @@
     <button id="btnDelete" class="danger">🗑 删除</button>
   </div>
   <div class="group">
-    <button id="btnSortAZ">A→Z 排序</button>
-    <button id="btnSortDate">按日期排序</button>
-  </div>
-  <div class="group">
-    <button id="btnDedup">🔍 去重</button>
+    <button id="btnFindDup">🔍 查找重复</button>
     <button id="btnCheck">🔗 检测失效</button>
   </div>
   <div class="group">
@@ -212,15 +219,19 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.2.1</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.3.0</span>
   </div>
 </div>
 
 <div class="main">
   <div class="sidebar">
     <div class="sidebar-header">
-      <span>文件夹</span>
-      <span id="totalCount" style="color:var(--muted); font-weight:400; font-size:11px;"></span>
+      <div class="left">
+        <span>文件夹</span>
+        <button class="fold-btn" id="btnFoldAll" title="全部折叠">⊟</button>
+        <button class="fold-btn" id="btnUnfoldAll" title="全部展开">⊞</button>
+      </div>
+      <span id="totalCount" class="count"></span>
     </div>
     <div class="tree" id="tree"></div>
   </div>
@@ -251,7 +262,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 
 /* ============================================================
  *  数据模型
@@ -266,12 +277,12 @@ const uid = () => 'n' + (++uidCounter) + '_' + Date.now().toString(36);
 let sortState = { key: null, dir: 1 };
 
 const DEFAULT_COLS = {
-  '__fav': 28,
-  'title': 240,
-  'url': 400,
-  'status': 70,
+  '__fav': 24,
+  'title': 260,
+  'url': 380,
+  'status': 64,
+  'date': 140,
   'tag': 110,
-  'type': 80,
 };
 let colWidths = loadColWidths();
 
@@ -347,15 +358,88 @@ function exportBookmarks() {
   lines.push('<DL><p>');
   for (const child of root.children) lines.push(...nodeToLines(child, 1));
   lines.push('</DL><p>');
-  const blob = new Blob([lines.join('\n')], { type: 'text/html;charset=utf-8' });
+  downloadHtml(lines.join('\n'), `bookmarks_${new Date().toISOString().slice(0,10)}.html`);
+  setStatus('已导出全部书签');
+}
+
+/**
+ * 导出选中项：重建层级结构，只保留选中的 folder/bookmark。
+ * 父级文件夹如果没有选中，只要它的后代有选中，就"补"出一个同名文件夹。
+ */
+function exportSelected() {
+  if (!root) { alert('还没有导入书签'); return; }
+  if (!selectedIds.size) { alert('请先选中要导出的项'); return; }
+  // 构造一个"虚拟根"，把选中项及其祖先链重建
+  const virtualRoot = newFolder(root.title, []);
+  const memo = new Map(); // folderId -> virtual folder node
+
+  function ensureFolderChain(folderNode) {
+    if (folderNode === root) return virtualRoot;
+    if (memo.has(folderNode.id)) return memo.get(folderNode.id);
+    // 找到 parent
+    const r = findById(folderNode.id);
+    const parentVirtual = r && r.parent ? ensureFolderChain(r.parent) : virtualRoot;
+    const v = newFolder(folderNode.title, []);
+    v.addDate = folderNode.addDate;
+    parentVirtual.children.push(v);
+    memo.set(folderNode.id, v);
+    return v;
+  }
+
+  // 保证顺序：按选中 id 在原树遍历顺序处理
+  const ordered = [];
+  walkAll(root, (n) => { if (selectedIds.has(n.id)) ordered.push(n); });
+
+  for (const n of ordered) {
+    if (n === root) continue;
+    const r = findById(n.id);
+    if (!r || !r.parent) continue;
+    if (n.type === 'bookmark') {
+      const parentVirtual = ensureFolderChain(r.parent);
+      parentVirtual.children.push({ ...n });
+    } else {
+      // 文件夹：即使没选中内部书签，也把整个文件夹（原样）补进去
+      const parentVirtual = ensureFolderChain(r.parent);
+      const v = newFolder(n.title, deepCloneChildren(n));
+      v.addDate = n.addDate;
+      parentVirtual.children.push(v);
+      memo.set(n.id, v);
+    }
+  }
+
+  const lines = [];
+  lines.push('<!DOCTYPE NETSCAPE-Bookmark-file-1>');
+  lines.push('<!-- This is an automatically generated file.');
+  lines.push('     It will be read and overwritten.');
+  lines.push('     DO NOT EDIT! -->');
+  lines.push('<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">');
+  lines.push('<TITLE>Bookmarks</TITLE>');
+  lines.push('<H1>Bookmarks</H1>');
+  lines.push('<DL><p>');
+  for (const child of virtualRoot.children) lines.push(...nodeToLines(child, 1));
+  lines.push('</DL><p>');
+  downloadHtml(lines.join('\n'), `bookmarks_selected_${new Date().toISOString().slice(0,10)}.html`);
+  setStatus('已导出 ' + selectedIds.size + ' 个选中项');
+}
+
+function deepCloneChildren(node) {
+  if (node.type === 'bookmark') return [];
+  return node.children.map(c => {
+    if (c.type === 'bookmark') return { ...c };
+    const f = newFolder(c.title, deepCloneChildren(c));
+    f.addDate = c.addDate; f.lastModified = c.lastModified;
+    return f;
+  });
+}
+
+function downloadHtml(html, filename) {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `bookmarks_${new Date().toISOString().slice(0,10)}.html`;
-  a.click();
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
-  setStatus('已导出 ' + a.download);
 }
+
 function nodeToLines(node, depth) {
   const pad = '    '.repeat(depth);
   if (node.type === 'folder') {
@@ -421,6 +505,12 @@ function isDescendant(ancestor, node) {
   }
   return false;
 }
+function fmtDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 /* ============================================================
  *  树渲染
@@ -432,6 +522,7 @@ function renderTree() {
   treeEl.innerHTML = '';
   if (!root) {
     treeEl.innerHTML = '<div class="empty">尚未导入书签</div>';
+    document.getElementById('totalCount').textContent = '';
     return;
   }
   const rootRow = document.createElement('div');
@@ -443,7 +534,6 @@ function renderTree() {
     sortState = { key: null, dir: 1 };
     renderTree(); renderList();
   };
-  // 根也接受 drop（放进根内）
   rootRow.ondragover = (e) => {
     e.preventDefault(); e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
@@ -516,7 +606,6 @@ function renderFolderNode(node) {
   row.ondragstart = (e) => { startDrag(e, node.id); e.dataTransfer.effectAllowed = 'move'; };
   row.ondragend = clearDragStyles;
 
-  // 三分区：上 25% 同级之前 / 中间 50% 放进内部 / 下 25% 同级之后
   row.ondragover = (e) => {
     e.preventDefault(); e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
@@ -562,20 +651,28 @@ function clearTreeIndicator() {
     .forEach(el => el.classList.remove('drop-before', 'drop-after', 'drop-target'));
 }
 
+function collapseAll(collapse) {
+  if (!root) return;
+  if (collapse) {
+    walkAll(root, (n) => { if (n.type === 'folder' && n !== root) collapsed.add(n.id); });
+  } else {
+    collapsed.clear();
+  }
+  renderTree();
+}
+
 /* ============================================================
  *  拖拽（多选）
  * ============================================================ */
 let dragIds = [];
 
 function startDrag(e, primaryId) {
-  // 关键：不在 dragstart 里重渲 DOM，否则浏览器会取消拖拽
   if (selectedIds.has(primaryId) && selectedIds.size > 1) {
     dragIds = [...selectedIds];
   } else {
     dragIds = [primaryId];
     selectedIds.clear();
     selectedIds.add(primaryId);
-    // 只更新 class，不 re-render
     document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected'));
     document.querySelectorAll('.tree-row.active').forEach(el => el.classList.remove('active'));
     const el = document.querySelector(`.list-item[data-id="${primaryId}"]`);
@@ -601,10 +698,8 @@ function getDragIds(e) {
 function clearDragStyles() {
   dragIds = [];
   document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-  document.querySelectorAll('.drop-target, .drop-before, .drop-after, .drop-line').forEach(el => {
-    el.classList.remove('drop-target', 'drop-before', 'drop-after', 'drop-line');
-    if (el.classList.contains('drop-line')) el.remove();
-  });
+  document.querySelectorAll('.drop-target, .drop-before, .drop-after, .drop-into')
+    .forEach(el => el.classList.remove('drop-target', 'drop-before', 'drop-after', 'drop-into'));
 }
 
 /* ============================================================
@@ -650,18 +745,13 @@ function dropSibling(ids, refNode, position) {
   setStatus(`已移动 ${items.length} 项`);
 }
 
-/**
- * 收集可移动的 items。
- * filterSelf: 目标自身（不能被拖进自己）
- * excludeRef: 同级排序时排除的参照物（拖到它前后）
- */
 function collectMovable(ids, filterSelf = null, excludeRef = null) {
   const items = [];
   const seen = new Set();
   for (const id of ids) {
     if (seen.has(id)) continue;
     seen.add(id);
-    if (id === filterSelf?.id) continue;
+    if (filterSelf && id === filterSelf.id) continue;
     if (excludeRef && id === excludeRef.id) continue;
     const r = findById(id);
     if (!r || r.node === root) continue;
@@ -676,19 +766,18 @@ function collectMovable(ids, filterSelf = null, excludeRef = null) {
  *  列表栏（表头）+ splitter
  * ============================================================ */
 const COLUMNS = [
-  { key: '__fav',  label: '',     sortable: false, always: true },
-  { key: 'title',  label: '标题', sortable: true,  always: true },
-  { key: 'url',    label: '网址', sortable: true,  always: true },
-  { key: 'status', label: '状态', sortable: true,  always: true },
-  { key: 'tag',    label: '位置', sortable: true,  onlySearch: true },
-  { key: 'type',   label: '类型', sortable: true,  onlyFolder: true },
+  { key: '__fav',  label: '',       sortable: false },
+  { key: 'title',  label: '标题',   sortable: true },
+  { key: 'url',    label: '网址',   sortable: true },
+  { key: 'status', label: '状态',   sortable: true },
+  { key: 'date',   label: '添加时间', sortable: true },
+  { key: 'tag',    label: '位置',   sortable: true,  onlySearch: true },
 ];
 
 function visibleColumns() {
   const isSearch = !!searchQuery;
   return COLUMNS.filter(c => {
     if (c.onlySearch && !isSearch) return false;
-    if (c.onlyFolder && isSearch) return false;
     return true;
   });
 }
@@ -718,36 +807,45 @@ function renderListHeader() {
     if (col.sortable) d.onclick = () => toggleSort(col.key);
     el.appendChild(d);
 
-    if (i < cols.length - 1) {
-      const sp = document.createElement('div');
-      sp.className = 'splitter';
-      sp.dataset.leftKey = col.key;
-      sp.dataset.rightKey = cols[i + 1].key;
-      sp.onmousedown = (e) => beginColResize(e, col.key, cols[i + 1].key);
-      el.appendChild(sp);
-    }
+    // 每列右侧都有 splitter
+    const sp = document.createElement('div');
+    sp.className = 'splitter';
+    sp.dataset.leftKey = col.key;
+    sp.dataset.rightKey = i + 1 < cols.length ? cols[i + 1].key : null;
+    sp.onmousedown = (e) => beginColResize(e, col.key, sp.dataset.rightKey);
+    sp.ondblclick = (e) => {
+      e.preventDefault();
+      autoFitColumn(col.key);
+    };
+    el.appendChild(sp);
   });
+  // 末尾 filler，让 header 撑满剩余宽度
+  const filler = document.createElement('div');
+  filler.style.flex = '1';
+  el.appendChild(filler);
 }
 
 function beginColResize(e, leftKey, rightKey) {
   e.preventDefault();
   const startX = e.clientX;
   const startL = colWidths[leftKey] || DEFAULT_COLS[leftKey] || 100;
-  const startR = colWidths[rightKey] || DEFAULT_COLS[rightKey] || 100;
+  const startR = rightKey ? (colWidths[rightKey] || DEFAULT_COLS[rightKey] || 100) : null;
   const splitter = e.currentTarget;
   splitter.classList.add('dragging');
   document.body.classList.add('col-resizing');
 
   const onMove = (ev) => {
     const dx = ev.clientX - startX;
-    const newL = Math.max(30, startL + dx);
-    const newR = Math.max(30, startR - dx);
+    const newL = Math.max(20, startL + dx);
     colWidths[leftKey] = newL;
-    colWidths[rightKey] = newR;
     document.querySelectorAll(`.list-header .col[data-key="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
-    document.querySelectorAll(`.list-header .col[data-key="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
     document.querySelectorAll(`.list-item > *[data-colkey="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
-    document.querySelectorAll(`.list-item > *[data-colkey="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
+    if (rightKey && startR !== null) {
+      const newR = Math.max(20, startR - dx);
+      colWidths[rightKey] = newR;
+      document.querySelectorAll(`.list-header .col[data-key="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
+      document.querySelectorAll(`.list-item > *[data-colkey="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
+    }
   };
   const onUp = () => {
     document.removeEventListener('mousemove', onMove);
@@ -758,6 +856,28 @@ function beginColResize(e, leftKey, rightKey) {
   };
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
+}
+
+function autoFitColumn(key) {
+  // 量所有可见的该列宽度
+  const samples = document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`);
+  let max = 60;
+  samples.forEach(el => {
+    // 用一个隐藏 span 量文字宽度
+    const text = el.textContent || '';
+    const span = document.createElement('span');
+    span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:13px "Segoe UI","Microsoft YaHei",sans-serif;';
+    span.textContent = text;
+    document.body.appendChild(span);
+    const w = span.getBoundingClientRect().width + 22; // padding 余量
+    document.body.removeChild(span);
+    if (w > max) max = w;
+  });
+  max = Math.min(max, 800);
+  colWidths[key] = max;
+  saveColWidths();
+  renderListHeader();
+  document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`).forEach(el => el.style.width = max + 'px');
 }
 
 function toggleSort(key) {
@@ -773,8 +893,8 @@ function applySort(items) {
       case 'title': return (it.title || '').toLowerCase();
       case 'url': return (it.url || '').toLowerCase();
       case 'status': return it.linkStatus || '';
+      case 'date': return it.addDate || 0;
       case 'tag': { const p = findParentFolderOf(it.id); return (p ? p.title : '').toLowerCase(); }
-      case 'type': return it.type;
       default: return '';
     }
   };
@@ -829,6 +949,10 @@ function renderList() {
     : (root && currentFolder ? folderPath(currentFolder) : '');
   selectAllBtn.style.display = 'inline-block';
 
+  // 全选/全不选 两态文字
+  const allSelected = items.length > 0 && items.every(i => selectedIds.has(i.id));
+  selectAllBtn.textContent = allSelected ? '全不选' : '全选';
+
   renderListHeader();
 
   listEl.innerHTML = '';
@@ -872,13 +996,13 @@ function renderList() {
           cell.classList.add(it.linkStatus);
           cell.textContent = it.linkStatus === 'ok' ? '可用' : it.linkStatus === 'bad' ? '失效' : '检查中';
         }
+      } else if (col.key === 'date') {
+        cell.classList.add('date');
+        cell.textContent = fmtDate(it.addDate);
       } else if (col.key === 'tag') {
         cell.classList.add('tag');
         const p = findParentFolderOf(it.id);
         cell.textContent = p ? p.title : '';
-      } else if (col.key === 'type') {
-        cell.classList.add('type');
-        cell.textContent = it.type === 'folder' ? '文件夹' : '书签';
       }
       row.appendChild(cell);
     });
@@ -926,19 +1050,31 @@ function renderList() {
       e.dataTransfer.dropEffect = 'move';
       const rect = row.getBoundingClientRect();
       const rel = (e.clientY - rect.top) / rect.height;
-      clearDropLine();
-      const line = document.createElement('div');
-      line.className = 'drop-line';
-      if (rel < 0.5) row.parentNode.insertBefore(line, row);
-      else row.parentNode.insertBefore(line, row.nextSibling);
+      clearListIndicator();
+      if (it.type === 'folder') {
+        if (rel < 0.25) row.classList.add('drop-before');
+        else if (rel > 0.75) row.classList.add('drop-after');
+        else row.classList.add('drop-into');
+      } else {
+        if (rel < 0.5) row.classList.add('drop-before');
+        else row.classList.add('drop-after');
+      }
     };
     row.ondrop = (e) => {
       e.preventDefault(); e.stopPropagation();
-      clearDropLine();
-      const ids = getDragIds(e);
       const rect = row.getBoundingClientRect();
-      const before = (e.clientY - rect.top) / rect.height < 0.5;
-      reorderMulti(ids, it.id, before);
+      const rel = (e.clientY - rect.top) / rect.height;
+      const cls = row.classList.contains('drop-into') ? 'into'
+                : row.classList.contains('drop-before') ? 'before'
+                : row.classList.contains('drop-after') ? 'after' : null;
+      clearListIndicator();
+      const ids = getDragIds(e);
+      if (cls === 'into' && it.type === 'folder') {
+        dropIntoFolder(ids, it.id);
+      } else {
+        const before = (cls === 'before') || (cls === null && rel < 0.5);
+        reorderMulti(ids, it.id, before);
+      }
     };
 
     listEl.appendChild(row);
@@ -947,8 +1083,9 @@ function renderList() {
   updateSelectionInfo();
 }
 
-function clearDropLine() {
-  document.querySelectorAll('.drop-line').forEach(el => el.remove());
+function clearListIndicator() {
+  document.querySelectorAll('.list-item.drop-before, .list-item.drop-after, .list-item.drop-into')
+    .forEach(el => el.classList.remove('drop-before', 'drop-after', 'drop-into'));
 }
 
 let lastClickedIdx = -1;
@@ -1009,88 +1146,59 @@ function createFolder() {
 }
 
 /* ============================================================
- *  工具栏排序
+ *  查找重复（先报告，再确认删除）
  * ============================================================ */
-function sortChildren(folder, key) {
-  folder.children.sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-    if (key === 'az') return (a.title || '').localeCompare(b.title || '', 'zh');
-    if (key === 'date') return (b.addDate || 0) - (a.addDate || 0);
-    return 0;
-  });
-  for (const c of folder.children) if (c.type === 'folder') sortChildren(c, key);
-}
-function sortCurrentAZ() {
-  if (!currentFolder) return;
-  sortChildren(currentFolder, 'az');
-  sortState = { key: null, dir: 1 };
-  renderTree(); renderList();
-  setStatus('已按 A→Z 排序（含子文件夹）');
-}
-function sortCurrentDate() {
-  if (!currentFolder) return;
-  sortChildren(currentFolder, 'date');
-  sortState = { key: null, dir: 1 };
-  renderTree(); renderList();
-  setStatus('已按添加日期（新→旧）排序');
-}
-
-/* ============================================================
- *  去重（带日志）
- * ============================================================ */
-function dedup() {
-  if (!root) return;
-  const scope = currentFolder || root;
+function findDuplicates(scope) {
   const seen = new Map();
   const removed = [];
-
   function traverse(folder, pathArr) {
-    const keep = [];
     for (const c of folder.children) {
-      if (c.type === 'folder') { traverse(c, [...pathArr, c.title]); keep.push(c); }
+      if (c.type === 'folder') { traverse(c, [...pathArr, c.title]); }
       else {
         const key = (c.url || '').trim().toLowerCase();
-        if (!key) { keep.push(c); continue; }
+        if (!key) continue;
         if (seen.has(key)) {
           const first = seen.get(key);
           removed.push({
+            node: c, parent: folder,
             title: c.title, url: c.url,
             path: [...pathArr, folder.title].join(' / '),
             keptTitle: first.node.title, keptPath: first.path,
           });
         } else {
           seen.set(key, { node: c, path: [...pathArr, folder.title].join(' / ') });
-          keep.push(c);
         }
       }
     }
-    folder.children = keep;
   }
   traverse(scope, []);
+  return removed;
+}
 
-  renderTree();
-  if (searchQuery) doSearch(searchQuery); else renderList();
+function findDupDialog() {
+  if (!root) return;
+  const scope = currentFolder || root;
+  const dups = findDuplicates(scope);
 
-  if (!removed.length) {
+  if (!dups.length) {
     setStatus('没有发现重复书签');
-    showModal('去重结果', `<p>范围：<b>${esc(scope.title)}</b></p><p style="color:var(--muted); margin-top:8px;">没有发现重复书签。</p>`);
+    showModal('查找重复结果', `<p>范围：<b>${esc(scope.title)}</b></p><p style="color:var(--muted); margin-top:8px;">没有发现重复书签。</p>`);
     return;
   }
 
-  setStatus('去重完成：移除 ' + removed.length + ' 个重复书签');
-
+  // 生成 log
   const now = new Date().toLocaleString();
   const logLines = [
-    `# 书签去重日志`,
+    `# 重复书签日志`,
     `# 生成时间: ${now}`,
     `# 工具版本: v${APP_VERSION}`,
     `# 范围: ${scope.title}`,
     `# 保留策略: 每个 URL 保留遍历时遇到的第一个`,
-    `# 重复数: ${removed.length}`,
+    `# 重复数: ${dups.length}`,
     '',
   ];
-  removed.forEach((r, i) => {
-    logLines.push(`[${i + 1}] 已删除`);
+  dups.forEach((r, i) => {
+    logLines.push(`[${i + 1}] 待删除`);
     logLines.push(`    标题: ${r.title}`);
     logLines.push(`    URL : ${r.url}`);
     logLines.push(`    原位置: ${r.path}`);
@@ -1101,8 +1209,10 @@ function dedup() {
   const logText = logLines.join('\n');
   const escLog = logText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-  showModal(`去重结果（共删除 ${removed.length} 条）`, `
-    <p style="margin-bottom:10px;">范围：<b>${esc(scope.title)}</b></p>
+  setStatus(`发现 ${dups.length} 个重复书签，等待确认删除`);
+
+  showModal(`发现 ${dups.length} 个重复书签`, `
+    <p style="margin-bottom:10px;">范围：<b>${esc(scope.title)}</b>，将保留每个 URL 最早出现的一个。</p>
     <div class="log-box">${escLog}</div>
   `, [
     { label: '复制日志', action: () => {
@@ -1114,11 +1224,21 @@ function dedup() {
         const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `dedup_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.log`;
+        a.download = `duplicates_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.log`;
         a.click();
         URL.revokeObjectURL(a.href);
       }},
-    { label: '关闭', primary: true, action: closeModal },
+    { label: '取消', action: closeModal },
+    { label: `确定删除 ${dups.length} 项重复`, primary: true, action: () => {
+        // 真正执行删除
+        for (const r of dups) {
+          if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
+        }
+        closeModal();
+        renderTree(); renderList();
+        if (searchQuery) doSearch(searchQuery);
+        setStatus(`已删除 ${dups.length} 个重复书签`);
+      }},
   ]);
 }
 
@@ -1311,10 +1431,9 @@ function showContextMenu(x, y, node) {
       const name = prompt('新文件夹名称：', '新建文件夹');
       if (name !== null) { node.children.unshift(newFolder(name.trim() || '新建文件夹')); renderTree(); renderList(); }
     });
-    sep();
-    add('🔤 A→Z 排序', () => { sortChildren(node, 'az'); renderTree(); renderList(); });
-    add('📅 按日期排序', () => { sortChildren(node, 'date'); renderTree(); renderList(); });
   }
+  sep();
+  add('💾 导出选中项为 HTML', () => exportSelected(), false);
   sep();
   if (selectedIds.size > 1) {
     add(`🗑 删除选中的 ${selectedIds.size} 项`, deleteSelected, true);
@@ -1360,7 +1479,8 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.2.1</b> · 修复拖拽失效（dragstart 不再重渲 DOM）、树同级 drop 改为行内 25%/75% 三分区（无占位间隙）<br>
+      <b>v1.3.0</b> · 全部折叠/展开、列表拖入文件夹、drop 标记法（防弹回）、导出选中、列表加时间列、splitter 双击自适应 + 末列可拉、全选两态、查找重复（先报告再确认删除）<br>
+      <b>v1.2.1</b> · 修复拖拽失效（dragstart 不再重渲 DOM）<br>
       <b>v1.2.0</b> · 列宽 splitter、多选拖拽、树同级插入<br>
       <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志；修复搜索全选<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
@@ -1417,14 +1537,15 @@ document.getElementById('fileInput').onchange = (e) => {
   e.target.value = '';
 };
 document.getElementById('btnExport').onclick = exportBookmarks;
+document.getElementById('btnExportSelected').onclick = exportSelected;
 document.getElementById('btnNewFolder').onclick = createFolder;
 document.getElementById('btnDelete').onclick = deleteSelected;
-document.getElementById('btnSortAZ').onclick = sortCurrentAZ;
-document.getElementById('btnSortDate').onclick = sortCurrentDate;
-document.getElementById('btnDedup').onclick = dedup;
+document.getElementById('btnFindDup').onclick = findDupDialog;
 document.getElementById('btnCheck').onclick = checkLinks;
 document.getElementById('btnBatch').onclick = openBatchEdit;
 document.getElementById('btnAbout').onclick = showAbout;
+document.getElementById('btnFoldAll').onclick = () => collapseAll(true);
+document.getElementById('btnUnfoldAll').onclick = () => collapseAll(false);
 
 document.getElementById('btnSelectAll').onclick = () => {
   const items = searchQuery ? currentSearchResults : getVisibleItems();
