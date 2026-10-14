@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.2.0</title>
-<!-- 书签管理器 Pro v1.2.0 | 2026-10-14 -->
+<title>书签管理器 Pro v1.2.1</title>
+<!-- 书签管理器 Pro v1.2.1 | 2026-10-14 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -52,32 +52,21 @@
   .tree { flex: 1; overflow-y: auto; padding: 6px; }
   .tree-node { user-select: none; }
   .tree-row {
-    display: flex; align-items: center; gap: 4px; padding: 4px 6px;
+    display: flex; align-items: center; gap: 4px; padding: 5px 6px;
     border-radius: 4px; cursor: pointer; white-space: nowrap;
+    position: relative;
   }
   .tree-row:hover { background: var(--panel2); }
   .tree-row.active { background: var(--accent); color: #fff; }
   .tree-row.drop-target { background: var(--accent2); color: #fff; }
+  .tree-row.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
+  .tree-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--accent); }
   .tree-row .arrow { width: 14px; text-align: center; color: var(--muted); font-size: 10px; }
   .tree-row .icon { width: 16px; text-align: center; }
   .tree-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .tree-row .count { color: var(--muted); font-size: 11px; }
   .tree-row.active .count { color: #ddd; }
   .tree-children { margin-left: 14px; }
-  /* 树状栏间隙 drop 区 */
-  .tree-gap {
-    height: 4px; margin: 0; border-radius: 2px;
-  }
-  .tree-gap.active {
-    background: var(--accent); height: 3px; margin: 1px 0;
-    box-shadow: 0 0 6px var(--accent);
-  }
-  .tree-gap-inner {
-    height: 6px; border-radius: 3px;
-  }
-  .tree-gap-inner.active {
-    background: var(--accent); box-shadow: 0 0 6px var(--accent);
-  }
 
   .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
   .content-header {
@@ -85,7 +74,6 @@
     display: flex; align-items: center; gap: 10px; background: var(--panel);
   }
   .content-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
-  /* 列表栏（表头）*/
   .list-header {
     display: flex; align-items: stretch; padding: 0;
     background: var(--panel2); border-bottom: 1px solid var(--border);
@@ -97,14 +85,11 @@
     padding: 0 6px; overflow: hidden; white-space: nowrap;
     position: relative; flex-shrink: 0;
   }
-  .list-header .col .col-label {
-    flex: 1; overflow: hidden; text-overflow: ellipsis;
-  }
+  .list-header .col .col-label { flex: 1; overflow: hidden; text-overflow: ellipsis; }
   .list-header .col:hover { background: var(--border); color: var(--text); }
   .list-header .col .arrow { font-size: 9px; }
   .list-header .col.fav-col { cursor: default; justify-content: center; padding: 0; }
   .list-header .col.fav-col:hover { background: transparent; color: var(--muted); }
-  /* splitter 拉杆 */
   .splitter {
     width: 5px; cursor: col-resize; flex-shrink: 0;
     background: transparent; position: relative;
@@ -121,8 +106,8 @@
 
   .list { flex: 1; overflow-y: auto; padding: 6px; position: relative; }
   .list-item {
-    display: flex; align-items: center; padding: 7px 0;
-    border-radius: 5px; cursor: pointer; margin-bottom: 2px;
+    display: flex; align-items: center; padding: 6px 0;
+    border-radius: 5px; cursor: pointer; margin-bottom: 1px;
     user-select: none;
   }
   .list-item:hover { background: var(--panel2); }
@@ -141,6 +126,8 @@
   .list-item.selected .tag { background: rgba(255,255,255,.2); color: #fff; }
   .list-item .type { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item.selected .type { color: #fff; }
+  .drop-line { height: 2px; background: var(--accent); margin: 2px 0; border-radius: 1px; }
+  .dragging { opacity: .4; }
 
   .marquee {
     position: fixed; border: 1px solid var(--accent);
@@ -190,7 +177,6 @@
     padding: 4px 12px; background: var(--panel); border-top: 1px solid var(--border);
     font-size: 11px; color: var(--muted); display: flex; justify-content: space-between;
   }
-  .dragging { opacity: .4; }
   .empty { text-align: center; color: var(--muted); padding: 40px; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
@@ -226,7 +212,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.2.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.2.1</span>
   </div>
 </div>
 
@@ -265,7 +251,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 
 /* ============================================================
  *  数据模型
@@ -279,7 +265,6 @@ const uid = () => 'n' + (++uidCounter) + '_' + Date.now().toString(36);
 
 let sortState = { key: null, dir: 1 };
 
-/* 列宽（px）。键名对应列 key；'__fav' 特殊。 */
 const DEFAULT_COLS = {
   '__fav': 28,
   'title': 240,
@@ -309,7 +294,7 @@ function newBookmark(title, url, extra = {}) {
 }
 
 /* ============================================================
- *  解析 / 导出（同前）
+ *  解析 / 导出
  * ============================================================ */
 function parseBookmarks(html) {
   const parser = new DOMParser();
@@ -438,7 +423,7 @@ function isDescendant(ancestor, node) {
 }
 
 /* ============================================================
- *  树渲染（含同级间隙 drop 区）
+ *  树渲染
  * ============================================================ */
 const collapsed = new Set();
 
@@ -449,70 +434,41 @@ function renderTree() {
     treeEl.innerHTML = '<div class="empty">尚未导入书签</div>';
     return;
   }
-  // 根节点本身不可拖、不可删；它的子级统一渲染
   const rootRow = document.createElement('div');
   rootRow.className = 'tree-row';
   if (currentFolder === root) rootRow.classList.add('active');
   rootRow.innerHTML = `<span class="arrow">▼</span><span class="icon">📁</span><span class="name">${esc(root.title)}</span><span class="count">${countBookmarks(root)}</span>`;
-  rootRow.onclick = () => { currentFolder = root; selectedIds.clear(); sortState = { key: null, dir: 1 }; renderTree(); renderList(); };
+  rootRow.onclick = () => {
+    currentFolder = root; selectedIds.clear();
+    sortState = { key: null, dir: 1 };
+    renderTree(); renderList();
+  };
+  // 根也接受 drop（放进根内）
+  rootRow.ondragover = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    clearTreeIndicator();
+    rootRow.classList.add('drop-target');
+  };
+  rootRow.ondrop = (e) => {
+    e.preventDefault(); e.stopPropagation();
+    clearTreeIndicator();
+    dropIntoFolder(getDragIds(e), root.id);
+  };
   treeEl.appendChild(rootRow);
 
   const container = document.createElement('div');
   container.className = 'tree-children';
-  renderChildrenInto(container, root);
+  for (const child of root.children) {
+    if (child.type === 'folder') container.appendChild(renderFolderNode(child));
+  }
   treeEl.appendChild(container);
 
   document.getElementById('totalCount').textContent =
     countAll(root) + ' 项 / ' + countBookmarks(root) + ' 书签';
 }
 
-/**
- * 把 folder 的所有子级（文件夹 + 间隙）渲染进 container。
- * 每个子项前后都有间隙 drop 区，可以插入到同级。
- * 递归时同样处理。
- */
-function renderChildrenInto(container, folder) {
-  const children = folder.children;
-  // 顶部间隙
-  container.appendChild(makeGap(folder, 0));
-
-  children.forEach((child, i) => {
-    if (child.type === 'folder') {
-      container.appendChild(renderFolderNode(child, folder, i));
-    }
-    // 文件夹后面跟一个间隙（用于"插到这个文件夹之后"）
-    container.appendChild(makeGap(folder, i + 1));
-  });
-}
-
-/**
- * 生成一个同级间隙 drop 区。
- * parentFolder: 间隙归属的父文件夹
- * insertIndex: 插入到父文件夹 children 的哪个位置
- */
-function makeGap(parentFolder, insertIndex) {
-  const gap = document.createElement('div');
-  gap.className = 'tree-gap';
-  gap.dataset.parentId = parentFolder.id;
-  gap.dataset.index = insertIndex;
-
-  gap.ondragover = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    gap.classList.add('active');
-  };
-  gap.ondragleave = () => gap.classList.remove('active');
-  gap.ondrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    gap.classList.remove('active');
-    const ids = getDragIds(e);
-    dropToGap(ids, parentFolder.id, insertIndex);
-  };
-  return gap;
-}
-
-function renderFolderNode(node, parentFolder, indexInParent) {
+function renderFolderNode(node) {
   const wrap = document.createElement('div');
   wrap.className = 'tree-node';
 
@@ -556,27 +512,30 @@ function renderFolderNode(node, parentFolder, indexInParent) {
     renderTree(); renderList();
   };
 
-  // 拖拽：拖到文件夹"行" = 放进文件夹内；拖到"间隙" = 插入同级
   row.draggable = true;
-  row.ondragstart = (e) => {
-    const ids = startDrag(e, node.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
+  row.ondragstart = (e) => { startDrag(e, node.id); e.dataTransfer.effectAllowed = 'move'; };
   row.ondragend = clearDragStyles;
 
+  // 三分区：上 25% 同级之前 / 中间 50% 放进内部 / 下 25% 同级之后
   row.ondragover = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
-    row.classList.add('drop-target');
+    const rect = row.getBoundingClientRect();
+    const rel = (e.clientY - rect.top) / rect.height;
+    clearTreeIndicator();
+    if (rel < 0.25) row.classList.add('drop-before');
+    else if (rel > 0.75) row.classList.add('drop-after');
+    else row.classList.add('drop-target');
   };
-  row.ondragleave = () => row.classList.remove('drop-target');
   row.ondrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    row.classList.remove('drop-target');
+    e.preventDefault(); e.stopPropagation();
+    const rect = row.getBoundingClientRect();
+    const rel = (e.clientY - rect.top) / rect.height;
+    clearTreeIndicator();
     const ids = getDragIds(e);
-    dropIntoFolder(ids, node.id);
+    if (rel < 0.25) dropSibling(ids, node, 'before');
+    else if (rel > 0.75) dropSibling(ids, node, 'after');
+    else dropIntoFolder(ids, node.id);
   };
 
   row.oncontextmenu = (e) => {
@@ -587,33 +546,44 @@ function renderFolderNode(node, parentFolder, indexInParent) {
 
   wrap.appendChild(row);
 
-  if (!isCollapsed) {
+  if (!isCollapsed && node.children.length) {
     const childContainer = document.createElement('div');
     childContainer.className = 'tree-children';
-    renderChildrenInto(childContainer, node);
+    for (const c of node.children) {
+      if (c.type === 'folder') childContainer.appendChild(renderFolderNode(c));
+    }
     if (childContainer.children.length) wrap.appendChild(childContainer);
   }
   return wrap;
 }
 
+function clearTreeIndicator() {
+  document.querySelectorAll('.tree-row.drop-before, .tree-row.drop-after, .tree-row.drop-target')
+    .forEach(el => el.classList.remove('drop-before', 'drop-after', 'drop-target'));
+}
+
 /* ============================================================
- *  拖拽状态（多选）
+ *  拖拽（多选）
  * ============================================================ */
 let dragIds = [];
 
 function startDrag(e, primaryId) {
-  // 如果拖的是已选中的项，则拖动整个选区；否则只拖这一项
+  // 关键：不在 dragstart 里重渲 DOM，否则浏览器会取消拖拽
   if (selectedIds.has(primaryId) && selectedIds.size > 1) {
     dragIds = [...selectedIds];
   } else {
     dragIds = [primaryId];
     selectedIds.clear();
     selectedIds.add(primaryId);
-    renderList();
+    // 只更新 class，不 re-render
+    document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.tree-row.active').forEach(el => el.classList.remove('active'));
+    const el = document.querySelector(`.list-item[data-id="${primaryId}"]`);
+    if (el) el.classList.add('selected');
+    updateSelectionInfo();
   }
   e.dataTransfer.setData('text/plain', primaryId);
   e.dataTransfer.setData('application/x-bm-ids', JSON.stringify(dragIds));
-  // 高亮所有被拖的项
   dragIds.forEach(id => {
     const el = document.querySelector(`.list-item[data-id="${id}"], .tree-row[data-id="${id}"]`);
     if (el) el.classList.add('dragging');
@@ -631,8 +601,8 @@ function getDragIds(e) {
 function clearDragStyles() {
   dragIds = [];
   document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
-  document.querySelectorAll('.drop-target, .tree-gap.active, .drop-line').forEach(el => {
-    el.classList.remove('drop-target', 'active', 'drop-line');
+  document.querySelectorAll('.drop-target, .drop-before, .drop-after, .drop-line').forEach(el => {
+    el.classList.remove('drop-target', 'drop-before', 'drop-after', 'drop-line');
     if (el.classList.contains('drop-line')) el.remove();
   });
 }
@@ -643,52 +613,37 @@ function clearDragStyles() {
 function dropIntoFolder(ids, targetFolderId) {
   const tgt = findById(targetFolderId);
   if (!tgt || tgt.node.type !== 'folder') return;
-  const moved = moveItems(ids, (item) => {
-    // 加入目标文件夹末尾
-    tgt.node.children.push(item);
-  }, /*keepOrder*/ false, /*filterSelf*/ tgt.node);
-  renderTree(); renderList();
-  if (searchQuery) doSearch(searchQuery);
-  if (moved) setStatus(`已移动 ${moved} 项到「${tgt.node.title}」`);
-}
-
-/**
- * 拖到同级间隙：把 items 插到 parentFolder.children 的 insertIndex 处。
- * 处理：先移除所有待移动项，再按 index 插入（顺序保持）。
- */
-function dropToGap(ids, parentFolderId, insertIndex) {
-  const p = findById(parentFolderId);
-  if (!p || p.node.type !== 'folder') return;
-  const parent = p.node;
-
-  // 过滤掉不合法项
-  const items = [];
-  const seen = new Set();
-  for (const id of ids) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const r = findById(id);
-    if (!r || r.node === root) continue;
-    if (parent === r.node) continue;
-    // 不能把父节点拖进自己的子级
-    if (isDescendant(r.node, parent)) continue;
-    items.push(r);
-  }
+  const items = collectMovable(ids, tgt.node);
   if (!items.length) return;
-
-  // 记录 insertIndex 对应的目标锚点 id（因为移除会改变 index）
-  // 简单做法：把 insertIndex 视为"在 parent.children 第 insertIndex 个元素之前"
-  const beforeId = parent.children[insertIndex] ? parent.children[insertIndex].id : null;
-
-  // 从原父移除
   for (const r of items) {
     if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
   }
-  // 重新定位插入点
+  for (const r of items) tgt.node.children.push(r.node);
+  sortState = { key: null, dir: 1 };
+  renderTree(); renderList();
+  if (searchQuery) doSearch(searchQuery);
+  setStatus(`已移动 ${items.length} 项到「${tgt.node.title}」`);
+}
+
+function dropSibling(ids, refNode, position) {
+  const r = findById(refNode.id);
+  if (!r || !r.parent) return;
+  const parent = r.parent;
+  const items = collectMovable(ids, parent, refNode);
+  if (!items.length) return;
+
+  const refIdx = parent.children.findIndex(c => c.id === refNode.id);
+  const beforeId = position === 'before'
+    ? refNode.id
+    : (parent.children[refIdx + 1] ? parent.children[refIdx + 1].id : null);
+
+  for (const it of items) {
+    if (it.parent) it.parent.children = it.parent.children.filter(c => c.id !== it.node.id);
+  }
   let idx = beforeId ? parent.children.findIndex(c => c.id === beforeId) : parent.children.length;
   if (idx === -1) idx = parent.children.length;
+  parent.children.splice(idx, 0, ...items.map(i => i.node));
 
-  parent.children.splice(idx, 0, ...items.map(r => r.node));
   sortState = { key: null, dir: 1 };
   renderTree(); renderList();
   if (searchQuery) doSearch(searchQuery);
@@ -696,33 +651,29 @@ function dropToGap(ids, parentFolderId, insertIndex) {
 }
 
 /**
- * 把 items 从原位置搬到 applyTo(item) 指定的新位置。
- * filterSelf: 如果拖拽项包含 filterSelf 自身，跳过（用于防止把文件夹拖进自己）。
+ * 收集可移动的 items。
+ * filterSelf: 目标自身（不能被拖进自己）
+ * excludeRef: 同级排序时排除的参照物（拖到它前后）
  */
-function moveItems(ids, applyTo, keepOrder = false, filterSelf = null) {
+function collectMovable(ids, filterSelf = null, excludeRef = null) {
   const items = [];
   const seen = new Set();
   for (const id of ids) {
     if (seen.has(id)) continue;
     seen.add(id);
-    if (filterSelf && id === filterSelf.id) continue;
+    if (id === filterSelf?.id) continue;
+    if (excludeRef && id === excludeRef.id) continue;
     const r = findById(id);
     if (!r || r.node === root) continue;
     if (filterSelf && isDescendant(r.node, filterSelf)) continue;
+    if (filterSelf && r.node === filterSelf) continue;
     items.push(r);
   }
-  if (!items.length) return 0;
-  // 从原父移除
-  for (const r of items) {
-    if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
-  }
-  // 应用
-  for (const r of items) applyTo(r.node);
-  return items.length;
+  return items;
 }
 
 /* ============================================================
- *  列表栏（表头）+ splitter 拉杆
+ *  列表栏（表头）+ splitter
  * ============================================================ */
 const COLUMNS = [
   { key: '__fav',  label: '',     sortable: false, always: true },
@@ -764,11 +715,9 @@ function renderListHeader() {
       lbl.textContent = col.label;
     }
     d.appendChild(lbl);
-
     if (col.sortable) d.onclick = () => toggleSort(col.key);
     el.appendChild(d);
 
-    // splitter（最后一列后不加）
     if (i < cols.length - 1) {
       const sp = document.createElement('div');
       sp.className = 'splitter';
@@ -795,7 +744,6 @@ function beginColResize(e, leftKey, rightKey) {
     const newR = Math.max(30, startR - dx);
     colWidths[leftKey] = newL;
     colWidths[rightKey] = newR;
-    // 实时更新表头和列表宽度
     document.querySelectorAll(`.list-header .col[data-key="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
     document.querySelectorAll(`.list-header .col[data-key="${rightKey}"]`).forEach(el => el.style.width = newR + 'px');
     document.querySelectorAll(`.list-item > *[data-colkey="${leftKey}"]`).forEach(el => el.style.width = newL + 'px');
@@ -898,7 +846,6 @@ function renderList() {
     if (selectedIds.has(it.id)) row.classList.add('selected');
     row.dataset.id = it.id;
 
-    // 用可见列渲染每一格
     cols.forEach(col => {
       const cell = document.createElement('span');
       cell.dataset.colkey = col.key;
@@ -975,8 +922,7 @@ function renderList() {
     row.ondragend = clearDragStyles;
 
     row.ondragover = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
       const rect = row.getBoundingClientRect();
       const rel = (e.clientY - rect.top) / rect.height;
@@ -987,8 +933,8 @@ function renderList() {
       else row.parentNode.insertBefore(line, row.nextSibling);
     };
     row.ondrop = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
+      clearDropLine();
       const ids = getDragIds(e);
       const rect = row.getBoundingClientRect();
       const before = (e.clientY - rect.top) / rect.height < 0.5;
@@ -1011,33 +957,21 @@ function faviconUrl(url) {
   catch { return ''; }
 }
 
-/* 列表内排序（含多选）*/
 function reorderMulti(ids, targetId, before) {
   const tgt = findById(targetId);
   if (!tgt) return;
   const targetParent = tgt.parent || root;
-
-  const items = [];
-  const seen = new Set();
-  for (const id of ids) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    if (id === targetId) continue;
-    const r = findById(id);
-    if (!r || r.node === root) continue;
-    if (isDescendant(r.node, tgt.node)) continue; // 不能把父拖进子
-    items.push(r);
-  }
+  const items = collectMovable(ids, targetParent, tgt.node);
   if (!items.length) return;
 
-  // 记录目标锚点
-  const beforeId = before ? targetId : (targetParent.children[targetParent.children.findIndex(c => c.id === targetId) + 1]?.id || null);
+  const refIdx = targetParent.children.findIndex(c => c.id === targetId);
+  const beforeId = before
+    ? targetId
+    : (targetParent.children[refIdx + 1] ? targetParent.children[refIdx + 1].id : null);
 
-  // 从原父移除
   for (const r of items) {
     if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
   }
-  // 插回目标父
   let idx = beforeId ? targetParent.children.findIndex(c => c.id === beforeId) : targetParent.children.length;
   if (idx === -1) idx = targetParent.children.length;
   targetParent.children.splice(idx, 0, ...items.map(r => r.node));
@@ -1426,7 +1360,8 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.2.0</b> · 列表栏可拖拽 splitter（记忆列宽）、多选拖拽、树同级插入、drop 阈值优化<br>
+      <b>v1.2.1</b> · 修复拖拽失效（dragstart 不再重渲 DOM）、树同级 drop 改为行内 25%/75% 三分区（无占位间隙）<br>
+      <b>v1.2.0</b> · 列宽 splitter、多选拖拽、树同级插入<br>
       <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志；修复搜索全选<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
     </p>
@@ -1523,7 +1458,6 @@ document.addEventListener('keydown', (e) => {
 
 document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => {
-  // 只在拖入外部文件时生效（内部拖拽的 dataTransfer 无 files）
   if (e.dataTransfer.files && e.dataTransfer.files.length) {
     e.preventDefault();
     importFile(e.dataTransfer.files[0]);
