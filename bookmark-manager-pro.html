@@ -205,6 +205,7 @@
   </div>
   <div class="group">
     <button id="btnNewFolder">📁 新建文件夹</button>
+    <button id="btnNewBookmark">🔖 新增书签</button>
     <button id="btnDelete" class="danger">🗑 删除</button>
   </div>
   <div class="group">
@@ -714,7 +715,6 @@ function dropIntoFolder(ids, targetFolderId) {
     if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
   }
   for (const r of items) tgt.node.children.push(r.node);
-  sortState = { key: null, dir: 1 };
   renderTree(); renderList();
   if (searchQuery) doSearch(searchQuery);
   setStatus(`已移动 ${items.length} 项到「${tgt.node.title}」`);
@@ -739,7 +739,6 @@ function dropSibling(ids, refNode, position) {
   if (idx === -1) idx = parent.children.length;
   parent.children.splice(idx, 0, ...items.map(i => i.node));
 
-  sortState = { key: null, dir: 1 };
   renderTree(); renderList();
   if (searchQuery) doSearch(searchQuery);
   setStatus(`已移动 ${items.length} 项`);
@@ -1113,7 +1112,6 @@ function reorderMulti(ids, targetId, before) {
   if (idx === -1) idx = targetParent.children.length;
   targetParent.children.splice(idx, 0, ...items.map(r => r.node));
 
-  sortState = { key: null, dir: 1 };
   renderTree(); renderList();
   if (searchQuery) doSearch(searchQuery);
   setStatus(`已移动 ${items.length} 项`);
@@ -1143,6 +1141,33 @@ function createFolder() {
   parent.children.unshift(newFolder(name.trim() || '新建文件夹'));
   renderTree(); renderList();
   setStatus('已创建文件夹');
+}
+
+function createBookmark() {
+  if (!root) { alert('请先导入书签'); return; }
+  const parent = currentFolder || root;
+  if (parent.type !== 'folder') { alert('请先选择一个文件夹'); return; }
+  showModal('新增书签', `
+    <label>名称</label>
+    <input type="text" id="nb-title" placeholder="书签名称">
+    <label>网址</label>
+    <input type="text" id="nb-url" placeholder="https://">
+    <p style="color:var(--muted); font-size:12px; margin-top:10px;">
+      将保存到：<b>${esc(parent.title)}</b>
+    </p>
+  `, [
+    { label: '取消', action: closeModal },
+    { label: '添加', primary: true, action: () => {
+        const title = document.getElementById('nb-title').value.trim();
+        const url = document.getElementById('nb-url').value.trim();
+        if (!url) { alert('网址不能为空'); return; }
+        parent.children.push(newBookmark(title || url, url));
+        closeModal();
+        renderTree(); renderList();
+        if (searchQuery) doSearch(searchQuery);
+        setStatus('已新增书签「' + (title || url) + '」');
+      }},
+  ]);
 }
 
 /* ============================================================
@@ -1539,6 +1564,7 @@ document.getElementById('fileInput').onchange = (e) => {
 document.getElementById('btnExport').onclick = exportBookmarks;
 document.getElementById('btnExportSelected').onclick = exportSelected;
 document.getElementById('btnNewFolder').onclick = createFolder;
+document.getElementById('btnNewBookmark').onclick = createBookmark;
 document.getElementById('btnDelete').onclick = deleteSelected;
 document.getElementById('btnFindDup').onclick = findDupDialog;
 document.getElementById('btnCheck').onclick = checkLinks;
