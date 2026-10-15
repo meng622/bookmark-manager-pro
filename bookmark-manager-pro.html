@@ -120,6 +120,7 @@
     display: inline-flex; align-items: center;
     padding: 3px 0; cursor: pointer; user-select: none;
     max-width: 100%;
+    line-height: normal;   /* ← 加这一行 */
   }
   .list-item:hover { background: var(--panel2); }
   .list-item.selected { background: var(--accent); color: #fff; }
@@ -1163,7 +1164,6 @@ function renderList() {
     // 包装成 block 行
     const wrap = document.createElement('div');
     wrap.style.display = 'block';
-    wrap.style.lineHeight = '0';
     wrap.appendChild(row);
     listInner.appendChild(wrap);
   });
