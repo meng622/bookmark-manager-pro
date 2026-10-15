@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.7.0</title>
-<!-- 书签管理器 Pro v1.7.0 | 2026-10-15 -->
+<title>书签管理器 Pro v1.7.1</title>
+<!-- 书签管理器 Pro v1.7.1 | 2026-10-15 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -384,7 +384,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 
 /* ============================================================
  *  数据模型
@@ -1643,20 +1643,21 @@ function openRenameDialog() {
     { id: 'regex',   label: '正则' },
   ];
 
-  const tabBarHtml = tabs.map(t => {
-    const enabled = renameRule[t.id].enabled;
-    return `<div class="tab ${renameActiveTab === t.id ? 'active' : ''}" data-tab="${t.id}">
-      ${t.label}${enabled ? '<span class="dot"></span>' : ''}
-    </div>`;
-  }).join('');
+  // 预览表列宽状态（全局只初始化一次）
+  if (!window.__previewColWidths) window.__previewColWidths = { chk: 34, old: 420, arrow: 30, new: 420 };
+  // 预览勾选状态
+  if (!window.__renameChecked) window.__renameChecked = new Map();
+  targets.forEach(t => {
+    if (!window.__renameChecked.has(t.node.id)) window.__renameChecked.set(t.node.id, true);
+  });
 
-  // 弹窗整体 16:9、可拉伸
+  // 打开弹窗并一次性写入所有 DOM
   const box = document.getElementById('modalBox');
   document.getElementById('modalMask').classList.add('show');
   box.innerHTML = `
     <h3>✏️ 批量改名</h3>
     <div class="modal-body">
-      <div style="display:flex; gap:16px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+      <div style="display:flex; gap:16px; align-items:center; margin-bottom:10px; flex-wrap:wrap; flex-shrink:0;">
         <label style="display:flex; align-items:center; gap:6px; margin:0; color:var(--text); cursor:pointer;">
           <input type="checkbox" id="scope-folder" ${renameScope.folders ? 'checked' : ''}> 应用于文件夹
         </label>
@@ -1667,7 +1668,7 @@ function openRenameDialog() {
           共 ${targets.length} 项
         </span>
       </div>
-      <div class="tabs" id="renameTabs">${tabBarHtml}</div>
+      <div class="tabs" id="renameTabs"></div>
       <div class="tab-panel" id="tabPanel"></div>
       <div class="preview-wrap" id="previewWrap">
         <div class="preview-inner" id="previewInner"></div>
@@ -1680,7 +1681,7 @@ function openRenameDialog() {
     <div class="modal-resize-hint"></div>
   `;
 
-  // 尺寸控制：16:9，可拉伸
+  // 尺寸：16:9、可拉伸
   const w = Math.min(window.innerWidth * 0.9, 1400);
   const h = Math.min(window.innerHeight * 0.9, w * 9 / 16);
   box.style.width = w + 'px';
@@ -1689,15 +1690,12 @@ function openRenameDialog() {
   box.style.maxHeight = '92vh';
   box.style.overflow = 'hidden';
 
-  // 记录预览勾选状态（按 id + 类型）
-  if (!window.__renameChecked) window.__renameChecked = new Map();
+  // 获取所有关键 DOM 引用
+  const tabBarEl = document.getElementById('renameTabs');
+  const panelEl = document.getElementById('tabPanel');
+  const previewInnerEl = document.getElementById('previewInner');
 
-  // 初始化勾选状态
-  targets.forEach(t => {
-    const key = t.node.id;
-    if (!window.__renameChecked.has(key)) window.__renameChecked.set(key, true);
-  });
-
+  // 顶部开关
   document.getElementById('scope-folder').onchange = (e) => {
     renameScope.folders = e.target.checked;
     refreshPreview();
@@ -1710,9 +1708,7 @@ function openRenameDialog() {
   document.getElementById('renameApply').onclick = () => {
     const checked = getCheckedPreviewIds();
     if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
-    // 各类型独立计数
-    let folderIdx = 0, bmIdx = 0;
-    let cnt = 0;
+    let folderIdx = 0, bmIdx = 0, cnt = 0;
     for (const t of targets) {
       const type = t.node.type;
       if (type === 'folder' && !renameScope.folders) continue;
@@ -1728,44 +1724,30 @@ function openRenameDialog() {
     setStatus(`已批量改名 ${cnt} 个项`);
   };
 
-  // 拖动改变弹窗大小（用 CSS resize:both + 右下角手柄）
-  // 需要 JS 监听，因为我们的 modal 是 flex 布局，要限制内部滚动
-  // 利用 resize 事件在拖拽后重新调整
-  // （CSS resize:both 已经可以，这里补一个输入框自适应即可）
-
-  renderTabPanel(targets);
-
-  document.querySelectorAll('#renameTabs .tab').forEach(el => {
-    el.onclick = () => {
-      saveTabPanel();
-      renameActiveTab = el.dataset.tab;
-      renderTabsHeader(tabs);
-      renderTabPanel(targets);
-    };
-  });
-
-  function renderTabsHeader(tabs) {
-    const bar = document.getElementById('renameTabs');
-    bar.innerHTML = tabs.map(t => {
+  /* ---------- tab 栏 ---------- */
+  function renderTabs() {
+    tabBarEl.innerHTML = tabs.map(t => {
       const enabled = renameRule[t.id].enabled;
       return `<div class="tab ${renameActiveTab === t.id ? 'active' : ''}" data-tab="${t.id}">
         ${t.label}${enabled ? '<span class="dot"></span>' : ''}
       </div>`;
     }).join('');
-    bar.querySelectorAll('.tab').forEach(el => {
+    tabBarEl.querySelectorAll('.tab').forEach(el => {
       el.onclick = () => {
         saveTabPanel();
         renameActiveTab = el.dataset.tab;
-        renderTabsHeader(tabs);
-        renderTabPanel(targets);
+        renderTabs();
+        renderTabPanel();
       };
     });
   }
 
+  /* ---------- 保存当前 tab 输入 ---------- */
   function saveTabPanel() {
     const t = renameActiveTab;
     const r = renameRule[t];
     const q = (id) => document.getElementById(id);
+    if (!q('r-enabled')) return; // 面板还没渲染，跳过
     if (t === 'trim') {
       r.head = q('r-head').value;
       r.headN = parseInt(q('r-headN').value, 10) || 1;
@@ -1798,8 +1780,8 @@ function openRenameDialog() {
     }
   }
 
-  function renderTabPanel(targets) {
-    const panel = document.getElementById('tabPanel');
+  /* ---------- 渲染当前 tab 参数面板 ---------- */
+  function renderTabPanel() {
     const r = renameRule[renameActiveTab];
     const enabled = r.enabled;
     let html = `<div class="enable-row">
@@ -1911,46 +1893,33 @@ function openRenameDialog() {
       `;
     }
 
-    panel.innerHTML = html;
+    panelEl.innerHTML = html;
 
+    // 启用开关
     document.getElementById('r-enabled').onchange = (e) => {
       renameRule[renameActiveTab].enabled = e.target.checked;
-      const bar = document.getElementById('renameTabs');
-      bar.querySelectorAll('.tab').forEach(el => {
-        const id = el.dataset.tab;
-        const dot = el.querySelector('.dot');
-        if (renameRule[id].enabled && !dot) {
-          const d = document.createElement('span');
-          d.className = 'dot';
-          el.appendChild(d);
-        } else if (!renameRule[id].enabled && dot) {
-          dot.remove();
-        }
-      });
+      renderTabs();
       refreshPreview();
     };
-    panel.querySelectorAll('input, select').forEach(el => {
+    // 输入实时刷新
+    panelEl.querySelectorAll('input, select').forEach(el => {
       el.addEventListener('input', () => { saveTabPanel(); refreshPreview(); });
       el.addEventListener('change', () => { saveTabPanel(); refreshPreview(); });
     });
-
-    refreshPreview();
   }
 
-  // 预览表列宽（独立于主列表）
+  /* ---------- 预览表渲染 ---------- */
   const PREVIEW_COLS = [
-    { key: 'chk',   label: '',       w: 34,  sortable: false, fixed: true },
-    { key: 'old',   label: '原始',   w: 420, sortable: false, fixed: true },
-    { key: 'arrow', label: '',       w: 30,  sortable: false, fixed: true },
-    { key: 'new',   label: '改后',   w: 420, sortable: false, fixed: true },
+    { key: 'chk',   label: '',       def: 34,  fixed: true },
+    { key: 'old',   label: '原始',   def: 420, fixed: true },
+    { key: 'arrow', label: '',       def: 30,  fixed: true },
+    { key: 'new',   label: '改后',   def: 420, fixed: true },
   ];
-  if (!window.__previewColWidths) window.__previewColWidths = { chk: 34, old: 420, arrow: 30, new: 420 };
 
   function refreshPreview() {
-    const inner = document.getElementById('previewInner');
-    if (!inner) return;
+    if (!previewInnerEl) return;
 
-    // 过滤掉不参与的
+    // 过滤掉不参与的类型
     const visible = targets.filter(t => {
       const type = t.node.type;
       if (type === 'folder' && !renameScope.folders) return false;
@@ -1958,54 +1927,56 @@ function openRenameDialog() {
       return true;
     });
 
-    // 表头
-    const cols = PREVIEW_COLS;
-    let headerHtml = '<div class="preview-header">';
+    // 计算每列宽度
+    const colW = {};
     let totalW = 0;
-    cols.forEach(c => {
-      const w = window.__previewColWidths[c.key] || c.w;
+    PREVIEW_COLS.forEach(c => {
+      const w = window.__previewColWidths[c.key] || c.def;
+      colW[c.key] = w;
       totalW += w + 5;
-      headerHtml += `<div class="pcol ${c.key === 'chk' ? 'chk-col' : ''}" data-pkey="${c.key}" style="width:${w}px">${c.label}</div>`;
-      if (c.fixed) {
-        headerHtml += `<div class="splitter" data-pkey="${c.key}"></div>`;
-      }
     });
-    headerHtml += '</div>';
+
+    // 表头
+    let html = '<div class="preview-header">';
+    PREVIEW_COLS.forEach(c => {
+      const w = colW[c.key];
+      html += `<div class="pcol ${c.key === 'chk' ? 'chk-col' : ''}" data-pkey="${c.key}" style="width:${w}px">${c.label}</div>`;
+      if (c.fixed) html += `<div class="splitter" data-pkey="${c.key}"></div>`;
+    });
+    html += '</div>';
 
     // 行
     let folderIdx = 0, bmIdx = 0;
-    let rowsHtml = '';
-    visible.forEach((t) => {
+    visible.forEach(t => {
       const type = t.node.type;
       const idx = type === 'folder' ? folderIdx++ : bmIdx++;
       const oldT = t.node.title;
       const newT = applyAllRules(oldT, idx, type);
       const checked = window.__renameChecked.get(t.node.id) !== false;
       const folderMark = type === 'folder' ? '📁 ' : '';
-      rowsHtml += `<div class="preview-row ${checked ? '' : 'disabled'}" data-id="${t.node.id}"><div class="row-inner">`;
-      cols.forEach(c => {
-        const w = window.__previewColWidths[c.key] || c.w;
+
+      html += `<div class="preview-row ${checked ? '' : 'disabled'}" data-id="${t.node.id}"><div class="row-inner">`;
+      PREVIEW_COLS.forEach(c => {
+        const w = colW[c.key];
         if (c.key === 'chk') {
-          rowsHtml += `<div class="pcol chk-col" data-pkey="chk" style="width:${w}px"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></div>`;
+          html += `<div class="pcol chk-col" data-pkey="chk" style="width:${w}px"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></div>`;
         } else if (c.key === 'old') {
-          rowsHtml += `<div class="pcol old" data-pkey="old" style="width:${w}px" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</div>`;
+          html += `<div class="pcol old" data-pkey="old" style="width:${w}px" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</div>`;
         } else if (c.key === 'arrow') {
-          rowsHtml += `<div class="pcol arrow" data-pkey="arrow" style="width:${w}px">→</div>`;
+          html += `<div class="pcol arrow" data-pkey="arrow" style="width:${w}px">→</div>`;
         } else if (c.key === 'new') {
-          rowsHtml += `<div class="pcol new" data-pkey="new" style="width:${w}px" title="${escAttr(newT)}">${esc(folderMark + newT)}</div>`;
+          html += `<div class="pcol new" data-pkey="new" style="width:${w}px" title="${escAttr(newT)}">${esc(folderMark + newT)}</div>`;
         }
-        if (c.fixed) {
-          rowsHtml += `<div class="splitter" data-pkey="${c.key}"></div>`;
-        }
+        if (c.fixed) html += `<div class="splitter" data-pkey="${c.key}"></div>`;
       });
-      rowsHtml += '</div></div>';
+      html += '</div></div>';
     });
 
-    inner.innerHTML = headerHtml + rowsHtml;
-    inner.style.minWidth = totalW + 'px';
+    previewInnerEl.innerHTML = html;
+    previewInnerEl.style.minWidth = totalW + 'px';
 
-    // 事件
-    inner.querySelectorAll('.preview-chk').forEach(cb => {
+    // 勾选
+    previewInnerEl.querySelectorAll('.preview-chk').forEach(cb => {
       cb.onchange = (e) => {
         window.__renameChecked.set(cb.dataset.id, e.target.checked);
         const row = cb.closest('.preview-row');
@@ -2014,23 +1985,22 @@ function openRenameDialog() {
       };
     });
 
-    // 预览表 splitter（列宽可拖）
-    inner.querySelectorAll('.preview-header .splitter').forEach(sp => {
+    // 列宽拖拽
+    previewInnerEl.querySelectorAll('.preview-header .splitter').forEach(sp => {
       sp.onmousedown = (e) => {
         e.preventDefault();
         const key = sp.dataset.pkey;
         const startX = e.clientX;
-        const startW = window.__previewColWidths[key];
+        const startW = window.__previewColWidths[key] || PREVIEW_COLS.find(c => c.key === key).def;
         const onMove = (ev) => {
           let w = startW + (ev.clientX - startX);
           if (w < 30) w = 30;
           if (w > 1200) w = 1200;
           window.__previewColWidths[key] = w;
-          inner.querySelectorAll(`[data-pkey="${key}"]`).forEach(el => el.style.width = w + 'px');
-          // 重算
+          previewInnerEl.querySelectorAll(`[data-pkey="${key}"]`).forEach(el => el.style.width = w + 'px');
           let total = 0;
-          cols.forEach(c => { total += (window.__previewColWidths[c.key] || c.w) + 5; });
-          inner.style.minWidth = total + 'px';
+          PREVIEW_COLS.forEach(c => { total += (window.__previewColWidths[c.key] || c.def) + 5; });
+          previewInnerEl.style.minWidth = total + 'px';
         };
         const onUp = () => {
           document.removeEventListener('mousemove', onMove);
@@ -2044,11 +2014,16 @@ function openRenameDialog() {
 
   function getCheckedPreviewIds() {
     const out = new Set();
-    document.querySelectorAll('#previewInner .preview-chk').forEach(cb => {
+    previewInnerEl.querySelectorAll('.preview-chk').forEach(cb => {
       if (cb.checked) out.add(cb.dataset.id);
     });
     return out;
   }
+
+  /* ---------- 初始化：先 tab 栏、再面板、最后预览 ---------- */
+  renderTabs();
+  renderTabPanel();
+  refreshPreview();
 }
 
 /* ============================================================
@@ -2259,11 +2234,17 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.7.0</b> · 侧边栏可拖（磁吸默认 280px）、树状栏单击展开+切换、主列表横向滚动、批量改名弹窗 16:9 可拉伸 + 应用到文件夹/书签、示例文字抽象化<br>
-      <b>v1.6.0</b> · 批量改名（Tab式6种规则）<br>
-      <b>v1.5.0</b> · 预设清理标题（已废弃）<br>
-      <b>v1.4.0</b> · 重写列宽逻辑<br>
-      v1.0.0 · 导入/导出、搜索、拖拽整理
+      <b>v1.7.1</b> · 修复批量改名弹窗 tab 无法点击、预览区空白（重排初始化顺序、DOM 引用提前获取）<br>
+      <b>v1.7.0</b> · 侧边栏可拖（磁吸 280px）、树状栏单击展开+切换、主列表横向滚动、批量改名弹窗 16:9 可拉伸 + 应用到文件夹/书签、示例文字抽象化、预览表列宽可拖<br>
+      <b>v1.6.0</b> · 批量改名（Tab 式 6 种规则：裁剪/替换/删除/序号/前后缀/正则，规则可叠加、逐条勾选、实时预览）；行高亮只到列尾、右侧空白可框选<br>
+      <b>v1.5.0</b> · 预设清理标题（11 条规则可勾选 + 实时预览）<br>
+      <b>v1.4.0</b> · 重写列宽逻辑（固定列 + 末列 flex 填满、splitter 钳制防崩坏）、缩短行 padding、批量编辑简化为纯正则<br>
+      <b>v1.3.1</b> · splitter 拖拽钳制防崩坏、Delete 可删树文件夹、F2 内联重命名、批量编辑加正则、去掉时间列<br>
+      <b>v1.3.0</b> · 全部折叠/展开、列表拖入文件夹、drop 标记防弹回、导出选中、查找重复（先报告后确认删除）、列表栏排序、框选选择、去重日志<br>
+      <b>v1.2.1</b> · 修复拖拽失效（dragstart 不再重渲 DOM）、树同级改为行内三分区<br>
+      <b>v1.2.0</b> · 列宽 splitter、多选拖拽、树同级插入、drop 阈值优化<br>
+      <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志；修复搜索全选<br>
+      <b>v1.0.0</b> · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
     </p>
   `);
 }
