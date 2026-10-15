@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.6.0</title>
-<!-- 书签管理器 Pro v1.6.0 | 2026-10-15 -->
+<title>书签管理器 Pro v1.7.0</title>
+<!-- 书签管理器 Pro v1.7.0 | 2026-10-15 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -35,17 +35,19 @@
   button.danger:hover { background: var(--danger); border-color: var(--danger); }
   button.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
   button.primary:hover { filter: brightness(1.1); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  button:disabled:hover { background: var(--panel2); border-color: var(--border); color: var(--text); }
   input[type=text], input[type=search], input[type=number], select {
     background: var(--bg); color: var(--text); border: 1px solid var(--border);
     padding: 5px 8px; border-radius: 5px; font-size: 12px; outline: none;
   }
   input:focus, select:focus { border-color: var(--accent); }
   .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* 侧边栏：宽度由 JS 控制，右侧有一条可拖拽的分隔条 */
   .sidebar {
-    width: 280px; background: var(--panel); border-right: 1px solid var(--border);
+    width: 280px; min-width: 180px; max-width: 600px;
+    background: var(--panel);
     display: flex; flex-direction: column; overflow: hidden;
+    flex-shrink: 0;
   }
   .sidebar-header {
     padding: 8px 10px; border-bottom: 1px solid var(--border);
@@ -71,24 +73,44 @@
   .tree-row.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
   .tree-row.drop-after  { box-shadow: inset 0 -2px 0 0 var(--accent); }
   .tree-row .arrow { width: 14px; text-align: center; color: var(--muted); font-size: 10px; }
+  .tree-row.active .arrow { color: #ddd; }
   .tree-row .icon { width: 16px; text-align: center; }
   .tree-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 2px; }
   .tree-row .count { color: var(--muted); font-size: 11px; }
   .tree-row.active .count { color: #ddd; }
   .tree-children { margin-left: 14px; }
 
-  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  /* 侧边栏拖拽分隔线（唯一一条，紧贴 sidebar 右侧） */
+  #sidebarSplitter {
+    width: 6px; cursor: col-resize; flex-shrink: 0;
+    background: var(--bg); position: relative;
+  }
+  #sidebarSplitter::after {
+    content: ''; position: absolute; left: 2.5px; top: 0; bottom: 0;
+    width: 1px; background: var(--border);
+  }
+  #sidebarSplitter:hover::after, #sidebarSplitter.dragging::after {
+    background: var(--accent); width: 2px; left: 2px;
+  }
+  body.sidebar-resizing { cursor: col-resize !important; }
+  body.sidebar-resizing * { cursor: col-resize !important; user-select: none !important; }
+
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
   .content-header {
     padding: 8px 12px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 10px; background: var(--panel);
   }
   .content-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
+  /* 列表容器允许横向滚动 */
+  .list-header-scroll {
+    overflow-x: hidden; overflow-y: hidden;
+    background: var(--panel2); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5;
+  }
   .list-header {
     display: flex; align-items: stretch;
-    background: var(--panel2); border-bottom: 1px solid var(--border);
     font-size: 11px; color: var(--muted); user-select: none;
-    position: sticky; top: 0; z-index: 5; height: 28px;
-    overflow: hidden;
+    height: 28px;
   }
   .list-header .col {
     display: flex; align-items: center; gap: 3px; cursor: pointer;
@@ -113,19 +135,25 @@
   body.col-resizing { cursor: col-resize !important; }
   body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
 
-  .list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0; position: relative; }
-  .list-inner { min-width: 100%; }
-  /* 关键：行宽自适应内容，不铺满，让右侧留白可框选 */
+  /* 列表：主区，允许横向滚动 */
+  .list {
+    flex: 1; overflow: auto; padding: 0; position: relative;
+  }
+  .list-inner { display: inline-block; min-width: 100%; vertical-align: top; }
   .list-item {
-    display: inline-flex; align-items: center;
+    display: flex; align-items: center;
     padding: 3px 0; cursor: pointer; user-select: none;
-    max-width: 100%;
-    line-height: normal;   /* ← 加这一行 */
+    width: max-content; min-width: 100%;
   }
   .list-item:hover { background: var(--panel2); }
-  .list-item.selected { background: var(--accent); color: #fff; }
-  .list-item > span, .list-item > img { flex-shrink: 0; padding: 0 3px; }
-  .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; margin: 0 3px; }
+  /* 关键：高亮只覆盖到列尾。用内部一个包裹层控制高亮宽度 */
+  .list-item > .row-inner {
+    display: flex; align-items: center;
+    padding: 0;
+  }
+  .list-item.selected > .row-inner { background: var(--accent); color: #fff; }
+  .list-item > .row-inner > span, .list-item > .row-inner > img { flex-shrink: 0; padding: 0 3px; }
+  .list-item .favicon { width: 16px; height: 16px; flex-shrink: 0; margin: 0 3px; display: inline-flex; align-items: center; justify-content: center; }
   .list-item .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 2px; }
   .list-item .title .title-icon { flex: 0 0 auto; }
   .list-item .title .title-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -138,9 +166,9 @@
   .status.pending { background: rgba(224,175,104,.2); color: var(--warn); }
   .list-item .tag { font-size: 10px; padding: 1px 5px; border-radius: 3px; background: var(--panel2); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .list-item.selected .tag { background: rgba(255,255,255,.2); color: #fff; }
-  .list-item.drop-before { box-shadow: inset 0 2px 0 0 var(--accent); }
-  .list-item.drop-after  { box-shadow: inset 0 -2px 0 0 var(--accent); }
-  .list-item.drop-into   { background: var(--accent2); color: #fff; }
+  .list-item.drop-before > .row-inner { box-shadow: inset 0 2px 0 0 var(--accent); }
+  .list-item.drop-after  > .row-inner { box-shadow: inset 0 -2px 0 0 var(--accent); }
+  .list-item.drop-into   > .row-inner { background: var(--accent2); color: #fff; }
   .dragging { opacity: .4; }
 
   .inline-edit {
@@ -175,10 +203,12 @@
   .modal-mask.show { display: flex; }
   .modal {
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 18px; min-width: 560px; max-width: 94vw; max-height: 90vh;
+    padding: 18px; min-width: 480px; max-width: 96vw; max-height: 92vh;
     overflow: hidden; display: flex; flex-direction: column;
+    position: relative; resize: both;
   }
   .modal h3 { margin-bottom: 12px; font-size: 15px; flex-shrink: 0; }
+  .modal .modal-body { flex: 1; overflow: auto; display: flex; flex-direction: column; }
   .modal label { display: block; margin: 8px 0 4px; font-size: 12px; color: var(--muted); }
   .modal input[type=text], .modal input[type=number], .modal select {
     width: 100%; background: var(--bg); color: var(--text);
@@ -188,6 +218,14 @@
   .modal input[type=checkbox] { width: auto; }
   .modal code { background: var(--bg); padding: 1px 5px; border-radius: 3px; color: var(--accent2); }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-shrink: 0; }
+  /* 拉伸小手柄 */
+  .modal-resize-hint {
+    position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, transparent 0 50%, var(--muted) 50% 55%, transparent 55% 65%, var(--muted) 65% 70%, transparent 70%);
+    opacity: .6;
+  }
 
   /* Tab 栏 */
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 12px; flex-shrink: 0; }
@@ -207,7 +245,7 @@
     display: inline-block; width: 6px; height: 6px; border-radius: 50%;
     background: var(--ok); margin-left: 6px; vertical-align: middle;
   }
-  .tab-panel { flex: 1; overflow: auto; padding-right: 4px; }
+  .tab-panel { flex-shrink: 0; overflow: auto; padding-right: 4px; }
   .tab-panel.hidden { display: none; }
   .panel-row { display: flex; gap: 8px; align-items: flex-end; margin-top: 6px; }
   .panel-row > div { flex: 1; }
@@ -220,25 +258,41 @@
   .hint { color: var(--muted); font-size: 11px; line-height: 1.7; margin-top: 10px; }
   .hint code { background: #11111b; }
 
-  /* 预览表 */
+  /* 预览表（Windows 逻辑：可横向滚动、列宽可拖、行高亮只到列尾） */
   .preview-wrap {
     border: 1px solid var(--border); border-radius: 6px;
-    max-height: 280px; overflow: auto; margin-top: 12px; flex-shrink: 0;
-    background: var(--bg);
+    overflow: auto; margin-top: 12px; flex: 1; min-height: 120px;
+    background: var(--bg); position: relative;
   }
-  .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .preview-table th {
-    position: sticky; top: 0; background: var(--panel2); color: var(--muted);
-    padding: 6px 8px; text-align: left; font-weight: normal;
-    border-bottom: 1px solid var(--border); z-index: 1;
+  .preview-inner { display: inline-block; min-width: 100%; vertical-align: top; }
+  .preview-header {
+    display: flex; align-items: stretch; position: sticky; top: 0;
+    background: var(--panel2); color: var(--muted); z-index: 1;
+    border-bottom: 1px solid var(--border); height: 26px;
   }
-  .preview-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
-  .preview-table tr:last-child td { border-bottom: none; }
-  .preview-table .chk { width: 30px; text-align: center; }
-  .preview-table .old { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
-  .preview-table .arrow { width: 20px; text-align: center; color: var(--muted); }
-  .preview-table .new { color: var(--ok); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
-  .preview-table tr.disabled .new { color: var(--muted); text-decoration: line-through; }
+  .preview-header .pcol {
+    display: flex; align-items: center; padding: 0 6px;
+    overflow: hidden; white-space: nowrap; flex-shrink: 0;
+    font-size: 11px; cursor: pointer;
+  }
+  .preview-header .pcol.chk-col { justify-content: center; cursor: default; }
+  .preview-header .pcol:hover { background: var(--border); color: var(--text); }
+  .preview-row {
+    display: flex; align-items: center; font-size: 12px;
+    width: max-content; min-width: 100%;
+  }
+  .preview-row:hover { background: var(--panel2); }
+  .preview-row.disabled { opacity: .5; }
+  .preview-row > .row-inner { display: flex; align-items: center; }
+  .preview-row .pcol {
+    padding: 4px 6px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .preview-row .pcol.chk-col { text-align: center; }
+  .preview-row .pcol.old { color: var(--muted); }
+  .preview-row .pcol.arrow { text-align: center; color: var(--muted); }
+  .preview-row .pcol.new { color: var(--ok); font-weight: 500; }
+  .preview-row.disabled .pcol.new { color: var(--muted); text-decoration: line-through; }
 
   .log-box {
     background: #11111b; border: 1px solid var(--border); border-radius: 6px;
@@ -284,12 +338,12 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.6.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.7.0</span>
   </div>
 </div>
 
 <div class="main">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="left">
         <span>文件夹</span>
@@ -300,13 +354,16 @@
     </div>
     <div class="tree" id="tree"></div>
   </div>
+  <div id="sidebarSplitter" title="拖动调整宽度"></div>
   <div class="content">
     <div class="content-header">
       <h2 id="folderTitle">未导入</h2>
       <span id="folderPath" style="color:var(--muted); font-size:11px;"></span>
       <button id="btnSelectAll" style="display:none;">全选</button>
     </div>
-    <div class="list-header" id="listHeader"></div>
+    <div class="list-header-scroll" id="listHeaderScroll">
+      <div class="list-header" id="listHeader"></div>
+    </div>
     <div class="list" id="list"><div class="list-inner" id="listInner"></div></div>
   </div>
 </div>
@@ -327,7 +384,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 
 /* ============================================================
  *  数据模型
@@ -344,21 +401,36 @@ let sortState = { key: null, dir: 1 };
 
 const DEFAULT_COLS = {
   '__fav': 22,
-  'title': 240,
-  'url': 320,
+  'title': 260,
+  'url': 360,
   'status': 64,
 };
 let colWidths = loadColWidths();
 
 function loadColWidths() {
   try {
-    const s = localStorage.getItem('bm_col_widths_v2');
+    const s = localStorage.getItem('bm_col_widths_v3');
     if (s) return Object.assign({}, DEFAULT_COLS, JSON.parse(s));
   } catch (e) {}
   return Object.assign({}, DEFAULT_COLS);
 }
 function saveColWidths() {
-  try { localStorage.setItem('bm_col_widths_v2', JSON.stringify(colWidths)); } catch (e) {}
+  try { localStorage.setItem('bm_col_widths_v3', JSON.stringify(colWidths)); } catch (e) {}
+}
+
+// 侧边栏宽度
+const SIDEBAR_DEFAULT = 280;
+const SIDEBAR_MIN = 180;
+const SIDEBAR_MAX = 600;
+const SIDEBAR_SNAP = 12; // 磁吸判定像素
+let sidebarWidth = loadSidebarWidth();
+function loadSidebarWidth() {
+  const v = parseInt(localStorage.getItem('bm_sidebar_width'), 10);
+  if (!isNaN(v) && v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) return v;
+  return SIDEBAR_DEFAULT;
+}
+function saveSidebarWidth(w) {
+  try { localStorage.setItem('bm_sidebar_width', String(w)); } catch (e) {}
 }
 
 function newFolder(title, children = []) {
@@ -596,6 +668,10 @@ function makeInlineInput(node) {
 
 /* ============================================================
  *  树渲染
+ *  交互：单击文件夹 = 高亮 + 切右侧 + 展开（若收起）
+ *        再次单击同一文件夹 = 高亮 + 切右侧（不收）
+ *        单击箭头 = 只展开/收起
+ *        双击文件夹 = 高亮 + 切右侧（与单击等效，不再做额外事）
  * ============================================================ */
 const collapsed = new Set();
 
@@ -612,7 +688,8 @@ function renderTree() {
   if (currentFolder === root) rootRow.classList.add('active');
   rootRow.innerHTML = `<span class="arrow">▼</span><span class="icon">📁</span><span class="name">${esc(root.title)}</span><span class="count">${countBookmarks(root)}</span>`;
   rootRow.onclick = () => {
-    currentFolder = root; selectedIds.clear();
+    currentFolder = root;
+    selectedIds.clear();
     sortState = { key: null, dir: 1 };
     renderTree(); renderList();
   };
@@ -678,11 +755,20 @@ function renderFolderNode(node) {
   count.textContent = countBookmarks(node);
   row.appendChild(count);
 
-  row.onclick = () => {
+  // 单击：高亮 + 切右侧 + 展开（若收起）
+  row.onclick = (e) => {
+    if (editingId === node.id) return;
     currentFolder = node;
     selectedIds.clear();
     sortState = { key: null, dir: 1 };
+    // 若收起 → 展开；若已展开 → 保持不动（不收）
+    if (collapsed.has(node.id)) collapsed.delete(node.id);
     renderTree(); renderList();
+  };
+
+  row.ondblclick = (e) => {
+    // 双击当作"进入"——跟单击等效，只是把右键菜单可能触发的单击也一并走一次
+    e.preventDefault();
   };
 
   row.draggable = editingId !== node.id;
@@ -742,6 +828,50 @@ function collapseAll(collapse) {
     collapsed.clear();
   }
   renderTree();
+}
+
+/* ============================================================
+ *  侧边栏拖动
+ * ============================================================ */
+function setupSidebarSplitter() {
+  const sb = document.getElementById('sidebar');
+  const sp = document.getElementById('sidebarSplitter');
+  sb.style.width = sidebarWidth + 'px';
+
+  sp.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sb.getBoundingClientRect().width;
+    sp.classList.add('dragging');
+    document.body.classList.add('sidebar-resizing');
+
+    const onMove = (ev) => {
+      let w = startW + (ev.clientX - startX);
+      // 磁吸
+      if (Math.abs(w - SIDEBAR_DEFAULT) <= SIDEBAR_SNAP) w = SIDEBAR_DEFAULT;
+      if (w < SIDEBAR_MIN) w = SIDEBAR_MIN;
+      if (w > SIDEBAR_MAX) w = SIDEBAR_MAX;
+      sb.style.width = w + 'px';
+      sidebarWidth = w;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      sp.classList.remove('dragging');
+      document.body.classList.remove('sidebar-resizing');
+      saveSidebarWidth(Math.round(sb.getBoundingClientRect().width));
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // 双击恢复默认
+  sp.addEventListener('dblclick', () => {
+    sb.style.width = SIDEBAR_DEFAULT + 'px';
+    sidebarWidth = SIDEBAR_DEFAULT;
+    saveSidebarWidth(SIDEBAR_DEFAULT);
+  });
 }
 
 /* ============================================================
@@ -844,14 +974,14 @@ function collectMovable(ids, filterSelf = null, excludeRef = null) {
 }
 
 /* ============================================================
- *  列表栏（表头）+ splitter
+ *  列表栏（表头）+ splitter（横向滚动 + 列宽可拖）
  * ============================================================ */
 const COLUMNS = [
-  { key: '__fav',  label: '',     sortable: false, fixed: true  },
-  { key: 'title',  label: '标题', sortable: true,  fixed: true  },
-  { key: 'url',    label: '网址', sortable: true,  fixed: true  },
-  { key: 'status', label: '状态', sortable: true,  fixed: true  },
-  { key: 'tag',    label: '位置', sortable: true,  onlySearch: true, fixed: true },
+  { key: '__fav',  label: '',     sortable: false },
+  { key: 'title',  label: '标题', sortable: true  },
+  { key: 'url',    label: '网址', sortable: true  },
+  { key: 'status', label: '状态', sortable: true  },
+  { key: 'tag',    label: '位置', sortable: true,  onlySearch: true },
 ];
 
 function visibleColumns() {
@@ -870,10 +1000,14 @@ function renderListHeader() {
   }
   el.innerHTML = '';
   const cols = visibleColumns();
+  let totalWidth = 0;
   cols.forEach((col) => {
+    const w = colWidths[col.key] || DEFAULT_COLS[col.key] || 100;
+    totalWidth += w + 5;
+
     const d = document.createElement('div');
     d.className = 'col' + (col.key === '__fav' ? ' fav-col' : '');
-    d.style.width = (colWidths[col.key] || DEFAULT_COLS[col.key] || 100) + 'px';
+    d.style.width = w + 'px';
     d.dataset.key = col.key;
 
     const lbl = document.createElement('span');
@@ -894,6 +1028,9 @@ function renderListHeader() {
     sp.ondblclick = (e) => { e.preventDefault(); autoFitColumn(col.key); };
     el.appendChild(sp);
   });
+
+  // 让表头和列表内容同宽（多出来的用 padding 吸收，不额外占 splitter）
+  el.style.minWidth = totalWidth + 'px';
 }
 
 function beginColResize(e, key) {
@@ -911,6 +1048,8 @@ function beginColResize(e, key) {
     if (w > 1200) w = 1200;
     colWidths[key] = w;
     applyWidthToDom(key, w);
+    // 让表头 min-width 重新计算
+    recalcHeaderWidth();
   };
   const onUp = () => {
     document.removeEventListener('mousemove', onMove);
@@ -923,13 +1062,22 @@ function beginColResize(e, key) {
   document.addEventListener('mouseup', onUp);
 }
 
+function recalcHeaderWidth() {
+  const el = document.getElementById('listHeader');
+  if (!el) return;
+  const cols = visibleColumns();
+  let total = 0;
+  cols.forEach(col => { total += (colWidths[col.key] || DEFAULT_COLS[col.key] || 100) + 5; });
+  el.style.minWidth = total + 'px';
+}
+
 function applyWidthToDom(key, w) {
   document.querySelectorAll(`.list-header .col[data-key="${key}"]`).forEach(el => el.style.width = w + 'px');
-  document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`).forEach(el => el.style.width = w + 'px');
+  document.querySelectorAll(`.list-item .col[data-colkey="${key}"]`).forEach(el => el.style.width = w + 'px');
 }
 
 function autoFitColumn(key) {
-  const samples = document.querySelectorAll(`.list-item > *[data-colkey="${key}"]`);
+  const samples = document.querySelectorAll(`.list-item .col[data-colkey="${key}"]`);
   let max = 40;
   samples.forEach(el => {
     const text = el.textContent || '';
@@ -937,7 +1085,7 @@ function autoFitColumn(key) {
     span.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:13px "Segoe UI","Microsoft YaHei",sans-serif;';
     span.textContent = text;
     document.body.appendChild(span);
-    const w = span.getBoundingClientRect().width + 14;
+    const w = span.getBoundingClientRect().width + 16;
     document.body.removeChild(span);
     if (w > max) max = w;
   });
@@ -946,6 +1094,7 @@ function autoFitColumn(key) {
   saveColWidths();
   renderListHeader();
   applyWidthToDom(key, max);
+  recalcHeaderWidth();
 }
 
 function toggleSort(key) {
@@ -1029,19 +1178,23 @@ function renderList() {
   }
 
   const cols = visibleColumns();
-  // 每行用 inline-block 换行，宽度自适应内容
+
   items.forEach((it, idx) => {
     const row = document.createElement('div');
     row.className = 'list-item';
     if (selectedIds.has(it.id)) row.classList.add('selected');
     row.dataset.id = it.id;
 
+    // 高亮只覆盖到列尾 —— 用一个 row-inner 包住所有列，高亮打在这里
+    const inner = document.createElement('div');
+    inner.className = 'row-inner';
+
     cols.forEach(col => {
       const cell = document.createElement('span');
+      cell.className = 'col';
       cell.dataset.colkey = col.key;
-      if (col.fixed) {
-        cell.style.width = (colWidths[col.key] || DEFAULT_COLS[col.key] || 100) + 'px';
-      }
+      const w = colWidths[col.key] || DEFAULT_COLS[col.key] || 100;
+      cell.style.width = w + 'px';
       if (col.key === '__fav') {
         cell.classList.add('favicon');
         if (it.type === 'bookmark') {
@@ -1082,13 +1235,10 @@ function renderList() {
         const p = findParentFolderOf(it.id);
         cell.textContent = p ? p.title : '';
       }
-      row.appendChild(cell);
+      inner.appendChild(cell);
     });
 
-    // 关键：每行末尾加一个换行占位，让多个 .list-item 各占一行
-    // 由于父容器是 block + 子元素 inline-flex，一个 div 后需要 <br> 或让父级为 block 布局
-    // 用简单方案：每个 list-item 外层包一个 div.row-wrapper
-    row.style.display = 'inline-flex';
+    row.appendChild(inner);
 
     row.onclick = (e) => {
       if (editingId === it.id) return;
@@ -1161,11 +1311,7 @@ function renderList() {
       }
     };
 
-    // 包装成 block 行
-    const wrap = document.createElement('div');
-    wrap.style.display = 'block';
-    wrap.appendChild(row);
-    listInner.appendChild(wrap);
+    listInner.appendChild(row);
   });
 
   updateSelectionInfo();
@@ -1375,6 +1521,7 @@ const renameRule = {
   affix:    { enabled: false, prefix: '', suffix: '', atN: '' },
   regex:    { enabled: false, pattern: '', repl: '', target: 'title' },
 };
+const renameScope = { folders: true, bookmarks: true };
 let renameActiveTab = 'trim';
 
 function applyRuleTrim(text, r) {
@@ -1461,10 +1608,7 @@ function applyRuleRegex(text, r) {
   return text.replace(re, r.repl || '');
 }
 
-/**
- * 按当前规则把 title 处理一遍。index 用于序号规则。
- */
-function applyAllRules(title, index) {
+function applyAllRules(title, index, type) {
   let t = title;
   if (renameRule.trim.enabled) t = applyRuleTrim(t, renameRule.trim);
   if (renameRule.replace.enabled) t = applyRuleReplace(t, renameRule.replace);
@@ -1478,12 +1622,15 @@ function applyAllRules(title, index) {
 function openRenameDialog() {
   const ids = [...selectedIds];
   const listItems = searchQuery ? currentSearchResults : getVisibleItems();
-  const targets = ids.length
-    ? ids.map(id => findById(id)).filter(x => x && x.node.type === 'bookmark')
-    : listItems.filter(i => i.type === 'bookmark').map(i => ({ node: i }));
+  let targets;
+  if (ids.length) {
+    targets = ids.map(id => findById(id)).filter(x => x && x.node !== root);
+  } else {
+    targets = (currentFolder ? currentFolder.children : []).map(n => ({ node: n }));
+  }
 
   if (!targets.length) {
-    alert('没有可改名的书签。请先选中书签，或进入某个有书签的文件夹。');
+    alert('没有可改名的项。请先选中项目，或进入某个有内容的文件夹。');
     return;
   }
 
@@ -1503,45 +1650,93 @@ function openRenameDialog() {
     </div>`;
   }).join('');
 
-  showModal('✏️ 批量改名', `
-    <p style="color:var(--muted); font-size:12px; margin-bottom:10px;">
-      作用范围：${ids.length ? '选中的 ' + ids.length + ' 个书签' : '当前文件夹可见的 ' + targets.length + ' 个书签'}。
-      每个 Tab 配一条规则，勾上"启用"就会按 Tab 顺序依次应用。
-    </p>
-    <div class="tabs" id="renameTabs">${tabBarHtml}</div>
-    <div class="tab-panel" id="tabPanel"></div>
-    <div class="preview-wrap">
-      <table class="preview-table" id="previewTable"></table>
+  // 弹窗整体 16:9、可拉伸
+  const box = document.getElementById('modalBox');
+  document.getElementById('modalMask').classList.add('show');
+  box.innerHTML = `
+    <h3>✏️ 批量改名</h3>
+    <div class="modal-body">
+      <div style="display:flex; gap:16px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:6px; margin:0; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="scope-folder" ${renameScope.folders ? 'checked' : ''}> 应用于文件夹
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; margin:0; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="scope-bookmark" ${renameScope.bookmarks ? 'checked' : ''}> 应用于书签
+        </label>
+        <span style="color:var(--muted); font-size:12px; margin-left:auto;">
+          共 ${targets.length} 项
+        </span>
+      </div>
+      <div class="tabs" id="renameTabs">${tabBarHtml}</div>
+      <div class="tab-panel" id="tabPanel"></div>
+      <div class="preview-wrap" id="previewWrap">
+        <div class="preview-inner" id="previewInner"></div>
+      </div>
     </div>
-  `, [
-    { label: '取消', action: () => { closeModal(); renderList(); } },
-    { label: `应用到 ${targets.length} 项`, primary: true, action: () => {
-        const checked = getCheckedPreviewIds();
-        if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
-        for (const t of targets) {
-          if (!checked.has(t.node.id)) continue;
-          const idx = targets.indexOf(t);
-          t.node.title = applyAllRules(t.node.title, idx);
-        }
-        closeModal();
-        renderTree(); renderList();
-        if (searchQuery) doSearch(searchQuery);
-        setStatus(`已批量改名 ${checked.size} 个书签`);
-      }},
-  ]);
+    <div class="modal-actions">
+      <button id="renameCancel">取消</button>
+      <button class="primary" id="renameApply">应用</button>
+    </div>
+    <div class="modal-resize-hint"></div>
+  `;
 
-  // 记录预览勾选状态
+  // 尺寸控制：16:9，可拉伸
+  const w = Math.min(window.innerWidth * 0.9, 1400);
+  const h = Math.min(window.innerHeight * 0.9, w * 9 / 16);
+  box.style.width = w + 'px';
+  box.style.height = h + 'px';
+  box.style.maxWidth = '96vw';
+  box.style.maxHeight = '92vh';
+  box.style.overflow = 'hidden';
+
+  // 记录预览勾选状态（按 id + 类型）
   if (!window.__renameChecked) window.__renameChecked = new Map();
+
+  // 初始化勾选状态
   targets.forEach(t => {
-    if (!window.__renameChecked.has(t.node.id)) window.__renameChecked.set(t.node.id, true);
+    const key = t.node.id;
+    if (!window.__renameChecked.has(key)) window.__renameChecked.set(key, true);
   });
+
+  document.getElementById('scope-folder').onchange = (e) => {
+    renameScope.folders = e.target.checked;
+    refreshPreview();
+  };
+  document.getElementById('scope-bookmark').onchange = (e) => {
+    renameScope.bookmarks = e.target.checked;
+    refreshPreview();
+  };
+  document.getElementById('renameCancel').onclick = () => { closeModal(); renderList(); };
+  document.getElementById('renameApply').onclick = () => {
+    const checked = getCheckedPreviewIds();
+    if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
+    // 各类型独立计数
+    let folderIdx = 0, bmIdx = 0;
+    let cnt = 0;
+    for (const t of targets) {
+      const type = t.node.type;
+      if (type === 'folder' && !renameScope.folders) continue;
+      if (type === 'bookmark' && !renameScope.bookmarks) continue;
+      if (!checked.has(t.node.id)) continue;
+      const idx = type === 'folder' ? folderIdx++ : bmIdx++;
+      t.node.title = applyAllRules(t.node.title, idx, type);
+      cnt++;
+    }
+    closeModal();
+    renderTree(); renderList();
+    if (searchQuery) doSearch(searchQuery);
+    setStatus(`已批量改名 ${cnt} 个项`);
+  };
+
+  // 拖动改变弹窗大小（用 CSS resize:both + 右下角手柄）
+  // 需要 JS 监听，因为我们的 modal 是 flex 布局，要限制内部滚动
+  // 利用 resize 事件在拖拽后重新调整
+  // （CSS resize:both 已经可以，这里补一个输入框自适应即可）
 
   renderTabPanel(targets);
 
-  // 绑定 tab 切换
   document.querySelectorAll('#renameTabs .tab').forEach(el => {
     el.onclick = () => {
-      // 保存当前面板值
       saveTabPanel();
       renameActiveTab = el.dataset.tab;
       renderTabsHeader(tabs);
@@ -1615,14 +1810,14 @@ function openRenameDialog() {
     if (renameActiveTab === 'trim') {
       html += `
         <div class="panel-row">
-          <div><label>开头锚点（留空=从头）</label>
-            <input type="text" id="r-head" value="${escAttr(r.head)}" placeholder="例如 Download"></div>
+          <div><label>开头词（留空 = 从头）</label>
+            <input type="text" id="r-head" value="${escAttr(r.head)}" placeholder="例如 开头词"></div>
           <div class="small"><label>第几个</label>
             <input type="number" id="r-headN" value="${r.headN}" min="1"></div>
         </div>
         <div class="panel-row">
-          <div><label>结尾锚点（留空=到尾）</label>
-            <input type="text" id="r-tail" value="${escAttr(r.tail)}" placeholder="例如 IMAX"></div>
+          <div><label>结尾词（留空 = 到尾）</label>
+            <input type="text" id="r-tail" value="${escAttr(r.tail)}" placeholder="例如 结尾词"></div>
           <div class="small"><label>第几个</label>
             <input type="number" id="r-tailN" value="${r.tailN}" min="1"></div>
         </div>
@@ -1631,19 +1826,22 @@ function openRenameDialog() {
             <input type="checkbox" id="r-trimCase" ${r.caseSensitive ? 'checked' : ''}> 区分大小写
           </label>
           <label style="display:flex; align-items:center; gap:6px; margin:0; color:var(--text);">
-            <input type="checkbox" id="r-trimEmpty" ${r.emptyIfNotFound ? 'checked' : ''}> 找不到锚点时删空标题
+            <input type="checkbox" id="r-trimEmpty" ${r.emptyIfNotFound ? 'checked' : ''}> 找不到锚点时删空
           </label>
         </div>
-        <p class="hint">例：开头填 <code>Download</code>，结尾填 <code>IMAX</code><br>
-        → <code>Download Wonder Woman 1984 (2020) IMAX Dual Audio {...} - UHDMovies</code><br>
-        → <code>Download Wonder Woman 1984 (2020) IMAX</code></p>
+        <p class="hint">
+          从「开头词」开始保留到「结尾词」结束，两头多余内容删掉。<br>
+          例：开头词填 <code>[开头词]</code>，结尾词填 <code>[结尾词]</code><br>
+          → <code>[开头词] xxx yyy [结尾词] zzz</code><br>
+          → <code>[开头词] xxx yyy [结尾词]</code>
+        </p>
       `;
     } else if (renameActiveTab === 'replace') {
       html += `
         <div class="panel-row">
           <div><label>查找</label>
-            <input type="text" id="r-find" value="${escAttr(r.find)}" placeholder="例如 Download"></div>
-          <div><label>替换为（留空=删除）</label>
+            <input type="text" id="r-find" value="${escAttr(r.find)}" placeholder="要查找的文字"></div>
+          <div><label>替换为（留空 = 删除）</label>
             <input type="text" id="r-repl" value="${escAttr(r.repl)}"></div>
           <div class="small"><label>第几个（空=全部）</label>
             <input type="number" id="r-replNth" value="${escAttr(r.nth)}" min="1"></div>
@@ -1651,7 +1849,7 @@ function openRenameDialog() {
         <label style="display:flex; align-items:center; gap:6px; margin-top:10px; color:var(--text);">
           <input type="checkbox" id="r-replCase" ${r.caseSensitive ? 'checked' : ''}> 区分大小写
         </label>
-        <p class="hint">例：查找 <code>Download</code>，替换留空 → 删除所有 Download。</p>
+        <p class="hint">例：查找 <code>[查找词]</code>，替换留空 → 删除所有「查找词」。<br>第几个留空 = 替换全部；填 2 = 只替换第 2 个匹配。</p>
       `;
     } else if (renameActiveTab === 'del') {
       html += `
@@ -1666,11 +1864,11 @@ function openRenameDialog() {
           <div><label>删除 M 个字符</label>
             <input type="number" id="r-delCount" value="${r.count}" min="1"></div>
         </div>
-        <p class="hint">例：从头、第 1 个字符开始、删 5 个 → 删掉开头 5 字。</p>
+        <p class="hint">例：从头、第 1 个字符开始、删 5 个 → 删掉开头 5 个字。</p>
       `;
     } else if (renameActiveTab === 'number') {
       html += `
-        <label>模板（<code>#</code>=序号，<code>&lt;SELF&gt;</code>=原标题）</label>
+        <label>模板（<code>#</code> = 序号，<code>&lt;SELF&gt;</code> = 原标题）</label>
         <input type="text" id="r-numTpl" value="${escAttr(r.tpl)}">
         <div class="panel-row">
           <div><label>起始</label>
@@ -1680,7 +1878,10 @@ function openRenameDialog() {
           <div><label>位数（补零）</label>
             <input type="number" id="r-numPad" value="${r.pad}" min="1"></div>
         </div>
-        <p class="hint">例：模板 <code>#. &lt;SELF&gt;</code> → <code>01. 原标题</code>、<code>02. 原标题</code>…</p>
+        <p class="hint">
+          例：模板 <code>#. &lt;SELF&gt;</code>，位数 2 → <code>01. 原标题</code>、<code>02. 原标题</code>…<br>
+          文件夹和书签各自独立计数。
+        </p>
       `;
     } else if (renameActiveTab === 'affix') {
       html += `
@@ -1690,9 +1891,9 @@ function openRenameDialog() {
           <div><label>后缀</label>
             <input type="text" id="r-affSuffix" value="${escAttr(r.suffix)}"></div>
         </div>
-        <label>从第 N 个字符位置插入（留空=直接首尾拼接）</label>
+        <label>从第 N 个字符位置插入（留空 = 直接首尾拼接）</label>
         <input type="number" id="r-affAtN" value="${escAttr(r.atN)}" min="1">
-        <p class="hint">例：前缀填 <code>[YouTube] </code>，留空 N → <code>[YouTube] 原标题</code></p>
+        <p class="hint">例：前缀填 <code>[前缀] </code>，留空 N → <code>[前缀] 原标题</code></p>
       `;
     } else if (renameActiveTab === 'regex') {
       html += `
@@ -1703,19 +1904,17 @@ function openRenameDialog() {
           <option value="both" ${r.target === 'both' ? 'selected' : ''}>标题和网址</option>
         </select>
         <label>正则模式</label>
-        <input type="text" id="r-regexPattern" value="${escAttr(r.pattern)}" placeholder="^Download\\s+(.+)$">
-        <label>替换为（$1 $2 捕获组，留空=删除）</label>
+        <input type="text" id="r-regexPattern" value="${escAttr(r.pattern)}" placeholder="例如 ^(.+?) \\|.*$">
+        <label>替换为（$1 $2 捕获组，留空 = 删除）</label>
         <input type="text" id="r-regexRepl" value="${escAttr(r.repl)}" placeholder="$1">
-        <p class="hint">高级用法：不熟悉正则就别用这个 Tab，用「裁剪 / 替换」更直观。</p>
+        <p class="hint">高级用法，熟悉正则再用。示例：模式 <code>^(.+?) \\|.*$</code> 替换 <code>$1</code> → 保留第一个竖线之前的内容。</p>
       `;
     }
 
     panel.innerHTML = html;
 
-    // 启用开关
     document.getElementById('r-enabled').onchange = (e) => {
       renameRule[renameActiveTab].enabled = e.target.checked;
-      // 更新 tab 圆点
       const bar = document.getElementById('renameTabs');
       bar.querySelectorAll('.tab').forEach(el => {
         const id = el.dataset.tab;
@@ -1728,8 +1927,8 @@ function openRenameDialog() {
           dot.remove();
         }
       });
+      refreshPreview();
     };
-    // 输入变化时实时更新预览
     panel.querySelectorAll('input, select').forEach(el => {
       el.addEventListener('input', () => { saveTabPanel(); refreshPreview(); });
       el.addEventListener('change', () => { saveTabPanel(); refreshPreview(); });
@@ -1738,46 +1937,114 @@ function openRenameDialog() {
     refreshPreview();
   }
 
-  function refreshPreview() {
-    const table = document.getElementById('previewTable');
-    let html = `<thead><tr>
-      <th class="chk"><input type="checkbox" id="previewAll" checked></th>
-      <th>原始标题</th>
-      <th class="arrow"></th>
-      <th>改后</th>
-    </tr></thead><tbody>`;
-    targets.forEach((t, i) => {
-      const checked = window.__renameChecked.get(t.node.id) !== false;
-      const oldT = t.node.title;
-      const newT = applyAllRules(oldT, i);
-      html += `<tr data-id="${t.node.id}" class="${checked ? '' : 'disabled'}">
-        <td class="chk"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></td>
-        <td class="old" title="${escAttr(oldT)}">${esc(oldT)}</td>
-        <td class="arrow">→</td>
-        <td class="new" title="${escAttr(newT)}">${esc(newT)}</td>
-      </tr>`;
-    });
-    html += '</tbody>';
-    table.innerHTML = html;
+  // 预览表列宽（独立于主列表）
+  const PREVIEW_COLS = [
+    { key: 'chk',   label: '',       w: 34,  sortable: false, fixed: true },
+    { key: 'old',   label: '原始',   w: 420, sortable: false, fixed: true },
+    { key: 'arrow', label: '',       w: 30,  sortable: false, fixed: true },
+    { key: 'new',   label: '改后',   w: 420, sortable: false, fixed: true },
+  ];
+  if (!window.__previewColWidths) window.__previewColWidths = { chk: 34, old: 420, arrow: 30, new: 420 };
 
-    document.getElementById('previewAll').onchange = (e) => {
-      const on = e.target.checked;
-      targets.forEach(t => window.__renameChecked.set(t.node.id, on));
-      refreshPreview();
-    };
-    table.querySelectorAll('.preview-chk').forEach(cb => {
+  function refreshPreview() {
+    const inner = document.getElementById('previewInner');
+    if (!inner) return;
+
+    // 过滤掉不参与的
+    const visible = targets.filter(t => {
+      const type = t.node.type;
+      if (type === 'folder' && !renameScope.folders) return false;
+      if (type === 'bookmark' && !renameScope.bookmarks) return false;
+      return true;
+    });
+
+    // 表头
+    const cols = PREVIEW_COLS;
+    let headerHtml = '<div class="preview-header">';
+    let totalW = 0;
+    cols.forEach(c => {
+      const w = window.__previewColWidths[c.key] || c.w;
+      totalW += w + 5;
+      headerHtml += `<div class="pcol ${c.key === 'chk' ? 'chk-col' : ''}" data-pkey="${c.key}" style="width:${w}px">${c.label}</div>`;
+      if (c.fixed) {
+        headerHtml += `<div class="splitter" data-pkey="${c.key}"></div>`;
+      }
+    });
+    headerHtml += '</div>';
+
+    // 行
+    let folderIdx = 0, bmIdx = 0;
+    let rowsHtml = '';
+    visible.forEach((t) => {
+      const type = t.node.type;
+      const idx = type === 'folder' ? folderIdx++ : bmIdx++;
+      const oldT = t.node.title;
+      const newT = applyAllRules(oldT, idx, type);
+      const checked = window.__renameChecked.get(t.node.id) !== false;
+      const folderMark = type === 'folder' ? '📁 ' : '';
+      rowsHtml += `<div class="preview-row ${checked ? '' : 'disabled'}" data-id="${t.node.id}"><div class="row-inner">`;
+      cols.forEach(c => {
+        const w = window.__previewColWidths[c.key] || c.w;
+        if (c.key === 'chk') {
+          rowsHtml += `<div class="pcol chk-col" data-pkey="chk" style="width:${w}px"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></div>`;
+        } else if (c.key === 'old') {
+          rowsHtml += `<div class="pcol old" data-pkey="old" style="width:${w}px" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</div>`;
+        } else if (c.key === 'arrow') {
+          rowsHtml += `<div class="pcol arrow" data-pkey="arrow" style="width:${w}px">→</div>`;
+        } else if (c.key === 'new') {
+          rowsHtml += `<div class="pcol new" data-pkey="new" style="width:${w}px" title="${escAttr(newT)}">${esc(folderMark + newT)}</div>`;
+        }
+        if (c.fixed) {
+          rowsHtml += `<div class="splitter" data-pkey="${c.key}"></div>`;
+        }
+      });
+      rowsHtml += '</div></div>';
+    });
+
+    inner.innerHTML = headerHtml + rowsHtml;
+    inner.style.minWidth = totalW + 'px';
+
+    // 事件
+    inner.querySelectorAll('.preview-chk').forEach(cb => {
       cb.onchange = (e) => {
         window.__renameChecked.set(cb.dataset.id, e.target.checked);
-        const tr = cb.closest('tr');
-        if (e.target.checked) tr.classList.remove('disabled');
-        else tr.classList.add('disabled');
+        const row = cb.closest('.preview-row');
+        if (e.target.checked) row.classList.remove('disabled');
+        else row.classList.add('disabled');
+      };
+    });
+
+    // 预览表 splitter（列宽可拖）
+    inner.querySelectorAll('.preview-header .splitter').forEach(sp => {
+      sp.onmousedown = (e) => {
+        e.preventDefault();
+        const key = sp.dataset.pkey;
+        const startX = e.clientX;
+        const startW = window.__previewColWidths[key];
+        const onMove = (ev) => {
+          let w = startW + (ev.clientX - startX);
+          if (w < 30) w = 30;
+          if (w > 1200) w = 1200;
+          window.__previewColWidths[key] = w;
+          inner.querySelectorAll(`[data-pkey="${key}"]`).forEach(el => el.style.width = w + 'px');
+          // 重算
+          let total = 0;
+          cols.forEach(c => { total += (window.__previewColWidths[c.key] || c.w) + 5; });
+          inner.style.minWidth = total + 'px';
+        };
+        const onUp = () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
       };
     });
   }
 
   function getCheckedPreviewIds() {
     const out = new Set();
-    document.querySelectorAll('#previewTable .preview-chk').forEach(cb => {
+    document.querySelectorAll('#previewInner .preview-chk').forEach(cb => {
       if (cb.checked) out.add(cb.dataset.id);
     });
     return out;
@@ -1841,7 +2108,7 @@ function doSearch(q) {
 }
 
 /* ============================================================
- *  框选（只在行宽之外的空白区触发）
+ *  框选
  * ============================================================ */
 function setupMarquee() {
   const listEl = document.getElementById('list');
@@ -1850,7 +2117,6 @@ function setupMarquee() {
 
   listEl.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    // 点在行内就不框选
     if (e.target.closest('.list-item')) return;
     dragging = true;
     additive = e.ctrlKey || e.metaKey;
@@ -1887,7 +2153,6 @@ function setupMarquee() {
     dragging = false;
     box.style.display = 'none';
     updateSelectionInfo();
-    // 如果只是单击空白（没有拖动），取消选中
     if (Math.abs(e.clientX - startX) < 4 && Math.abs(e.clientY - startY) < 4) {
       if (!additive) {
         selectedIds.clear();
@@ -1960,7 +2225,11 @@ document.addEventListener('click', hideContextMenu);
  * ============================================================ */
 function showModal(title, bodyHtml, buttons = [{ label: '关闭', action: closeModal }]) {
   const box = document.getElementById('modalBox');
-  box.innerHTML = `<h3>${title}</h3><div style="flex:1; overflow:auto; display:flex; flex-direction:column;">${bodyHtml}</div>`;
+  box.style.width = '';
+  box.style.height = '';
+  box.style.maxWidth = '96vw';
+  box.style.maxHeight = '92vh';
+  box.innerHTML = `<h3>${title}</h3><div class="modal-body">${bodyHtml}</div>`;
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   for (const b of buttons) {
@@ -1973,8 +2242,15 @@ function showModal(title, bodyHtml, buttons = [{ label: '关闭', action: closeM
   box.appendChild(actions);
   document.getElementById('modalMask').classList.add('show');
 }
-function closeModal() { document.getElementById('modalMask').classList.remove('show'); }
-document.getElementById('modalMask').onclick = (e) => { if (e.target.id === 'modalMask') closeModal(); };
+function closeModal() {
+  document.getElementById('modalMask').classList.remove('show');
+}
+// 点遮罩不关（按 6d）
+document.getElementById('modalMask').onclick = (e) => {
+  if (e.target.id === 'modalMask') {
+    // 不关
+  }
+};
 
 function showAbout() {
   showModal('关于', `
@@ -1983,10 +2259,10 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.6.0</b> · 批量改名（Tab 式 6 种规则可叠加、实时预览、逐条勾选）、行高亮只到列尾、右侧空白可框选<br>
+      <b>v1.7.0</b> · 侧边栏可拖（磁吸默认 280px）、树状栏单击展开+切换、主列表横向滚动、批量改名弹窗 16:9 可拉伸 + 应用到文件夹/书签、示例文字抽象化<br>
+      <b>v1.6.0</b> · 批量改名（Tab式6种规则）<br>
       <b>v1.5.0</b> · 预设清理标题（已废弃）<br>
-      <b>v1.4.0</b> · 重写列宽逻辑、缩短 padding<br>
-      <b>v1.3.1</b> · Delete 可删树状文件夹、F2 内联重命名<br>
+      <b>v1.4.0</b> · 重写列宽逻辑<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理
     </p>
   `);
@@ -2094,6 +2370,7 @@ document.addEventListener('drop', (e) => {
 
 // 初始化
 setupMarquee();
+setupSidebarSplitter();
 document.getElementById('version').textContent = 'v' + APP_VERSION;
 renderTree();
 renderList();
