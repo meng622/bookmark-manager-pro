@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.5.0</title>
-<!-- 书签管理器 Pro v1.5.0 | 2026-10-14 -->
+<title>书签管理器 Pro v1.6.0</title>
+<!-- 书签管理器 Pro v1.6.0 | 2026-10-15 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -35,11 +35,13 @@
   button.danger:hover { background: var(--danger); border-color: var(--danger); }
   button.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
   button.primary:hover { filter: brightness(1.1); }
-  input[type=text], input[type=search], select {
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button:disabled:hover { background: var(--panel2); border-color: var(--border); color: var(--text); }
+  input[type=text], input[type=search], input[type=number], select {
     background: var(--bg); color: var(--text); border: 1px solid var(--border);
     padding: 5px 8px; border-radius: 5px; font-size: 12px; outline: none;
   }
-  input:focus { border-color: var(--accent); }
+  input:focus, select:focus { border-color: var(--accent); }
   .main { flex: 1; display: flex; overflow: hidden; }
   .sidebar {
     width: 280px; background: var(--panel); border-right: 1px solid var(--border);
@@ -113,9 +115,11 @@
 
   .list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0; position: relative; }
   .list-inner { min-width: 100%; }
+  /* 关键：行宽自适应内容，不铺满，让右侧留白可框选 */
   .list-item {
-    display: flex; align-items: center; padding: 3px 0;
-    cursor: pointer; user-select: none;
+    display: inline-flex; align-items: center;
+    padding: 3px 0; cursor: pointer; user-select: none;
+    max-width: 100%;
   }
   .list-item:hover { background: var(--panel2); }
   .list-item.selected { background: var(--accent); color: #fff; }
@@ -170,38 +174,70 @@
   .modal-mask.show { display: flex; }
   .modal {
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
-    padding: 18px; min-width: 480px; max-width: 92vw; max-height: 88vh; overflow: auto;
+    padding: 18px; min-width: 560px; max-width: 94vw; max-height: 90vh;
+    overflow: hidden; display: flex; flex-direction: column;
   }
-  .modal h3 { margin-bottom: 12px; font-size: 15px; }
-  .modal label { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--muted); }
-  .modal input[type=text], .modal select, .modal textarea {
+  .modal h3 { margin-bottom: 12px; font-size: 15px; flex-shrink: 0; }
+  .modal label { display: block; margin: 8px 0 4px; font-size: 12px; color: var(--muted); }
+  .modal input[type=text], .modal input[type=number], .modal select {
     width: 100%; background: var(--bg); color: var(--text);
     border: 1px solid var(--border); padding: 7px 9px; border-radius: 5px;
     font-size: 13px; font-family: inherit; outline: none;
   }
-  .modal textarea { min-height: 80px; resize: vertical; font-family: Consolas, monospace; font-size: 12px; }
+  .modal input[type=checkbox] { width: auto; }
   .modal code { background: var(--bg); padding: 1px 5px; border-radius: 3px; color: var(--accent2); }
-  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-shrink: 0; }
 
-  /* 清理规则列表 */
-  .rules { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow: auto;
-           background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
-  .rule { display: flex; align-items: center; gap: 8px; padding: 5px 8px;
-          border-radius: 4px; cursor: pointer; }
-  .rule:hover { background: var(--panel2); }
-  .rule input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
-  .rule .desc { font-size: 12px; }
-  .rule .example { color: var(--muted); font-size: 11px; margin-left: 6px; }
+  /* Tab 栏 */
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 12px; flex-shrink: 0; }
+  .tab {
+    padding: 7px 14px; cursor: pointer; font-size: 13px;
+    border: 1px solid transparent; border-bottom: none;
+    border-radius: 6px 6px 0 0; color: var(--muted);
+    position: relative; top: 1px;
+  }
+  .tab:hover { background: var(--panel2); color: var(--text); }
+  .tab.active {
+    background: var(--bg); color: var(--text);
+    border-color: var(--border);
+    border-bottom-color: var(--bg);
+  }
+  .tab .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok); margin-left: 6px; vertical-align: middle;
+  }
+  .tab-panel { flex: 1; overflow: auto; padding-right: 4px; }
+  .tab-panel.hidden { display: none; }
+  .panel-row { display: flex; gap: 8px; align-items: flex-end; margin-top: 6px; }
+  .panel-row > div { flex: 1; }
+  .panel-row .small { flex: 0 0 90px; }
+  .enable-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: var(--bg); border-radius: 6px;
+    margin-bottom: 10px;
+  }
+  .hint { color: var(--muted); font-size: 11px; line-height: 1.7; margin-top: 10px; }
+  .hint code { background: #11111b; }
 
-  /* 预览框 */
-  .preview { margin-top: 10px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-  .preview-row { display: flex; font-size: 12px; }
-  .preview-row > div { padding: 6px 10px; min-width: 0; }
-  .preview-row .lbl { flex: 0 0 60px; color: var(--muted); background: var(--bg); }
-  .preview-row .val { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preview-row.old .val { color: var(--muted); text-decoration: line-through; }
-  .preview-row.new .val { color: var(--ok); font-weight: 500; }
-  .preview-row + .preview-row { border-top: 1px solid var(--border); }
+  /* 预览表 */
+  .preview-wrap {
+    border: 1px solid var(--border); border-radius: 6px;
+    max-height: 280px; overflow: auto; margin-top: 12px; flex-shrink: 0;
+    background: var(--bg);
+  }
+  .preview-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .preview-table th {
+    position: sticky; top: 0; background: var(--panel2); color: var(--muted);
+    padding: 6px 8px; text-align: left; font-weight: normal;
+    border-bottom: 1px solid var(--border); z-index: 1;
+  }
+  .preview-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .preview-table tr:last-child td { border-bottom: none; }
+  .preview-table .chk { width: 30px; text-align: center; }
+  .preview-table .old { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+  .preview-table .arrow { width: 20px; text-align: center; color: var(--muted); }
+  .preview-table .new { color: var(--ok); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 0; }
+  .preview-table tr.disabled .new { color: var(--muted); text-decoration: line-through; }
 
   .log-box {
     background: #11111b; border: 1px solid var(--border); border-radius: 6px;
@@ -240,14 +276,14 @@
     <button id="btnCheck">🔗 检测失效</button>
   </div>
   <div class="group">
-    <button id="btnClean">✂️ 清理标题</button>
+    <button id="btnRename">✏️ 批量改名</button>
   </div>
   <div class="group" style="flex:1; border:none;">
     <input type="search" id="searchBox" placeholder="🔍 搜索标题或网址..." style="flex:1; min-width:150px;">
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.5.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.6.0</span>
   </div>
 </div>
 
@@ -290,7 +326,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 
 /* ============================================================
  *  数据模型
@@ -857,10 +893,6 @@ function renderListHeader() {
     sp.ondblclick = (e) => { e.preventDefault(); autoFitColumn(col.key); };
     el.appendChild(sp);
   });
-
-  const filler = document.createElement('div');
-  filler.style.flex = '1';
-  el.appendChild(filler);
 }
 
 function beginColResize(e, key) {
@@ -996,7 +1028,7 @@ function renderList() {
   }
 
   const cols = visibleColumns();
-
+  // 每行用 inline-block 换行，宽度自适应内容
   items.forEach((it, idx) => {
     const row = document.createElement('div');
     row.className = 'list-item';
@@ -1052,11 +1084,10 @@ function renderList() {
       row.appendChild(cell);
     });
 
-    // 末尾 flex 占位，让选中行不铺满
-    const tail = document.createElement('div');
-    tail.style.flex = '1';
-    tail.style.minWidth = '0';
-    row.appendChild(tail);
+    // 关键：每行末尾加一个换行占位，让多个 .list-item 各占一行
+    // 由于父容器是 block + 子元素 inline-flex，一个 div 后需要 <br> 或让父级为 block 布局
+    // 用简单方案：每个 list-item 外层包一个 div.row-wrapper
+    row.style.display = 'inline-flex';
 
     row.onclick = (e) => {
       if (editingId === it.id) return;
@@ -1129,7 +1160,12 @@ function renderList() {
       }
     };
 
-    listInner.appendChild(row);
+    // 包装成 block 行
+    const wrap = document.createElement('div');
+    wrap.style.display = 'block';
+    wrap.style.lineHeight = '0';
+    wrap.appendChild(row);
+    listInner.appendChild(wrap);
   });
 
   updateSelectionInfo();
@@ -1283,13 +1319,11 @@ function findDupDialog() {
     return;
   }
 
-  const now = new Date().toLocaleString();
   const logLines = [
     `# 重复书签日志`,
-    `# 生成时间: ${now}`,
+    `# 生成时间: ${new Date().toLocaleString()}`,
     `# 工具版本: v${APP_VERSION}`,
     `# 范围: ${scope.title}`,
-    `# 保留策略: 每个 URL 保留遍历时遇到的第一个`,
     `# 重复数: ${dups.length}`,
     '',
   ];
@@ -1299,23 +1333,16 @@ function findDupDialog() {
     logLines.push(`    URL : ${r.url}`);
     logLines.push(`    原位置: ${r.path}`);
     logLines.push(`    保留项: ${r.keptTitle}`);
-    logLines.push(`    保留项位置: ${r.keptPath}`);
     logLines.push('');
   });
   const logText = logLines.join('\n');
   const escLog = logText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   setStatus(`发现 ${dups.length} 个重复书签，等待确认删除`);
-
   showModal(`发现 ${dups.length} 个重复书签`, `
     <p style="margin-bottom:10px;">范围：<b>${esc(scope.title)}</b>，将保留每个 URL 最早出现的一个。</p>
     <div class="log-box">${escLog}</div>
   `, [
-    { label: '复制日志', action: () => {
-        navigator.clipboard.writeText(logText).then(
-          () => setStatus('日志已复制到剪贴板'),
-          () => alert('复制失败'));
-      }},
     { label: '下载 .log', action: () => {
         const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' });
         const a = document.createElement('a');
@@ -1338,94 +1365,117 @@ function findDupDialog() {
 }
 
 /* ============================================================
- *  清理标题（预设规则 + 实时预览）
+ *  批量改名（Tab 式，仿拖把更名器）
  * ============================================================ */
-const CLEAN_RULES = [
-  {
-    id: 'yt-suffix',
-    desc: '去掉结尾的 " - YouTube"',
-    example: '标题 - YouTube',
-    apply: t => t.replace(/\s*-\s*YouTube\s*$/i, ''),
-  },
-  {
-    id: 'dblpipe',
-    desc: '去掉 " || " 之后的全部内容',
-    example: '标题 1080p || x264 WEB-DL',
-    apply: t => t.replace(/\s*\|\|.*$/, ''),
-  },
-  {
-    id: 'pipe-channel',
-    desc: '去掉 " | " 之后的全部内容（频道名等）',
-    example: '标题 | 频道名',
-    apply: t => t.replace(/\s*\|.*$/, ''),
-  },
-  {
-    id: 'hashtags',
-    desc: '去掉所有 "#标签"',
-    example: '标题 #drama #romantic #movie',
-    apply: t => t.replace(/\s*#[^\s#]+/g, ''),
-  },
-  {
-    id: 'site-tail',
-    desc: '去掉 " - 站点名" 类长尾巴（- 后跟多个词）',
-    example: '标题 - UHDMovies - 4k Dual Audio Movies, Ultra HD...',
-    apply: t => t.replace(/\s+-\s+(?=[^-]*[A-Za-z\u4e00-\u9fa5]).*$/s, (m) => {
-      // 仅在横线后跟的内容较长（含空格、逗号等）时切掉
-      const after = m.replace(/^\s+-\s+/, '');
-      if (after.length > 8 || /,|Movies|Download|Audio/.test(after)) return '';
-      return m;
-    }),
-  },
-  {
-    id: 'quality',
-    desc: '去掉分辨率/编码（1080p / 2160p / x264 / WEB-DL / BluRay / REMUX / HDR 等）',
-    example: '标题 1080p x264 WEB-DL',
-    apply: t => t.replace(
-      /\b(480p|720p|1080p|1440p|2160p|4k|8k|x264|x265|h\.?264|h\.?265|hevc|avc|web-?dl|webrip|bluray|blu-ray|bdrip|brrip|dvdrip|remux|hdr10\+?|hdr|dolby\s?vision|dolby\s?atmos|aac|ac3|dts|ddp?\d?\.?\d?|esubs?|subs?|dual[\s-]?audio|multi[\s-]?audio)\b/gi,
-      ''
-    ).replace(/\s{2,}/g, ' ').trim(),
-  },
-  {
-    id: 'site-name',
-    desc: '去掉 " - UHDMovies" 这类单站点名尾巴',
-    example: '标题 - UHDMovies',
-    apply: t => t.replace(/\s+-\s+(UHDMovies|YTS|RARBG|1337x|TorrentGalaxy|TamilBlasters|Moviesflix|MKVCinemas|Katmovie|9xmovies|ExtraMovies)\b.*$/i, ''),
-  },
-  {
-    id: 'brackets-tail',
-    desc: '去掉结尾的 {xxx} 或 [xxx] 括号块',
-    example: '标题 {Hindi-Japanese} [S03E017 Added]',
-    apply: t => t.replace(/(\s*[\{\[][^\}\]\n]*[\}\]])+\s*$/g, ''),
-  },
-  {
-    id: 'prefix-channel',
-    desc: '去掉开头 "(数字) 频道名" 前缀',
-    example: '(2) MultiSUB🔥标题',
-    apply: t => t.replace(/^\s*\(\d+\)\s*[A-Za-z0-9_\-]+\s*/, ''),
-  },
-  {
-    id: 'prefix-channel-2',
-    desc: '去掉开头 "数字. 频道名" 前缀',
-    example: '12. MultiSUB🔥标题',
-    apply: t => t.replace(/^\s*\d+[\.\)]\s*[A-Za-z0-9_\-]+\s*/, ''),
-  },
-  {
-    id: 'download-prefix',
-    desc: '去掉开头的 "Download " 字样',
-    example: 'Download Bau, Artist at War (2025)',
-    apply: t => t.replace(/^\s*Download\s+/i, ''),
-  },
-];
+const renameRule = {
+  trim:     { enabled: false, head: '', headN: 1, tail: '', tailN: 1, caseSensitive: false, emptyIfNotFound: false },
+  replace:  { enabled: false, find: '', repl: '', nth: '', caseSensitive: false },
+  del:      { enabled: false, dir: 'head', start: 1, count: 1 },
+  number:   { enabled: false, tpl: '#. <SELF>', start: 1, step: 1, pad: 1 },
+  affix:    { enabled: false, prefix: '', suffix: '', atN: '' },
+  regex:    { enabled: false, pattern: '', repl: '', target: 'title' },
+};
+let renameActiveTab = 'trim';
 
-function applyCleanRules(text, enabledIds) {
-  let t = text;
-  for (const r of CLEAN_RULES) {
-    if (enabledIds.has(r.id)) t = r.apply(t);
+function applyRuleTrim(text, r) {
+  if (!text) return text;
+  let start = 0, end = text.length;
+  if (r.head) {
+    const pos = findNth(text, r.head, r.headN, r.caseSensitive);
+    if (pos === -1) return r.emptyIfNotFound ? '' : text;
+    start = pos.idx;
   }
-  return t.trim();
+  if (r.tail) {
+    const pos = findNth(text, r.tail, r.tailN, r.caseSensitive);
+    if (pos === -1) return r.emptyIfNotFound ? '' : text;
+    end = pos.idx + r.tail.length;
+  }
+  if (end < start) return text;
+  return text.slice(start, end);
+}
+function findNth(text, needle, n, caseSensitive) {
+  if (n < 1) n = 1;
+  const t = caseSensitive ? text : text.toLowerCase();
+  const nd = caseSensitive ? needle : needle.toLowerCase();
+  let idx = -1, from = 0, count = 0;
+  while (true) {
+    idx = t.indexOf(nd, from);
+    if (idx === -1) return -1;
+    count++;
+    if (count === n) return { idx };
+    from = idx + 1;
+  }
+}
+function applyRuleReplace(text, r) {
+  if (!r.find) return text;
+  const flags = 'g' + (r.caseSensitive ? '' : 'i');
+  let re;
+  try { re = new RegExp(escapeReg(r.find), flags); }
+  catch (e) { return text; }
+  if (r.nth) {
+    const n = parseInt(r.nth, 10);
+    if (!isNaN(n) && n > 0) {
+      let i = 0;
+      return text.replace(re, (m) => (++i === n ? (r.repl || '') : m));
+    }
+  }
+  return text.replace(re, r.repl || '');
+}
+function escapeReg(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function applyRuleDel(text, r) {
+  const start = parseInt(r.start, 10) || 1;
+  const count = parseInt(r.count, 10) || 1;
+  if (r.dir === 'head') {
+    return text.slice(0, start - 1) + text.slice(start - 1 + count);
+  } else {
+    const idx = text.length - (start - 1) - count;
+    if (idx < 0) return text.slice(0, Math.max(0, text.length - (start - 1) - count) + count);
+    return text.slice(0, idx) + text.slice(idx + count);
+  }
+}
+function applyRuleNumber(text, r, index) {
+  const n = (parseInt(r.start, 10) || 1) + index * (parseInt(r.step, 10) || 1);
+  const pad = parseInt(r.pad, 10) || 1;
+  const num = String(n).padStart(pad, '0');
+  let tpl = r.tpl || '<SELF>';
+  if (!tpl.includes('<SELF>')) tpl = tpl + ' <SELF>';
+  return tpl.replace(/#/g, num).replace(/<SELF>/g, text);
+}
+function applyRuleAffix(text, r) {
+  let t = text;
+  if (r.atN) {
+    const n = parseInt(r.atN, 10);
+    if (!isNaN(n) && n > 0 && n <= t.length + 1) {
+      t = t.slice(0, n - 1) + (r.prefix || '') + t.slice(n - 1) + (r.suffix || '');
+      return t;
+    }
+  }
+  return (r.prefix || '') + t + (r.suffix || '');
+}
+function applyRuleRegex(text, r) {
+  if (!r.pattern) return text;
+  let re;
+  try { re = new RegExp(r.pattern, 'g'); }
+  catch (e) { return text; }
+  return text.replace(re, r.repl || '');
 }
 
-function openCleanDialog() {
+/**
+ * 按当前规则把 title 处理一遍。index 用于序号规则。
+ */
+function applyAllRules(title, index) {
+  let t = title;
+  if (renameRule.trim.enabled) t = applyRuleTrim(t, renameRule.trim);
+  if (renameRule.replace.enabled) t = applyRuleReplace(t, renameRule.replace);
+  if (renameRule.del.enabled) t = applyRuleDel(t, renameRule.del);
+  if (renameRule.affix.enabled) t = applyRuleAffix(t, renameRule.affix);
+  if (renameRule.regex.enabled) t = applyRuleRegex(t, renameRule.regex);
+  if (renameRule.number.enabled) t = applyRuleNumber(t, renameRule.number, index);
+  return t;
+}
+
+function openRenameDialog() {
   const ids = [...selectedIds];
   const listItems = searchQuery ? currentSearchResults : getVisibleItems();
   const targets = ids.length
@@ -1433,77 +1483,305 @@ function openCleanDialog() {
     : listItems.filter(i => i.type === 'bookmark').map(i => ({ node: i }));
 
   if (!targets.length) {
-    alert('没有可处理的书签。请先选中书签，或进入某个有书签的文件夹。');
+    alert('没有可改名的书签。请先选中书签，或进入某个有书签的文件夹。');
     return;
   }
 
-  // 默认勾选：常用 4 项
-  const defaultOn = new Set(['yt-suffix', 'dblpipe', 'hashtags', 'quality']);
+  const tabs = [
+    { id: 'trim',    label: '裁剪' },
+    { id: 'replace', label: '替换' },
+    { id: 'del',     label: '删除' },
+    { id: 'number',  label: '序号' },
+    { id: 'affix',   label: '前后缀' },
+    { id: 'regex',   label: '正则' },
+  ];
 
-  // 预览样本：取第一个书签
-  const sampleNode = targets[0].node;
+  const tabBarHtml = tabs.map(t => {
+    const enabled = renameRule[t.id].enabled;
+    return `<div class="tab ${renameActiveTab === t.id ? 'active' : ''}" data-tab="${t.id}">
+      ${t.label}${enabled ? '<span class="dot"></span>' : ''}
+    </div>`;
+  }).join('');
 
-  const rulesHtml = CLEAN_RULES.map(r => `
-    <label class="rule">
-      <input type="checkbox" data-rule-id="${r.id}" ${defaultOn.has(r.id) ? 'checked' : ''}>
-      <span>
-        <span class="desc">${esc(r.desc)}</span>
-        <span class="example">例：${esc(r.example)}</span>
-      </span>
-    </label>
-  `).join('');
-
-  showModal('✂️ 清理标题', `
+  showModal('✏️ 批量改名', `
     <p style="color:var(--muted); font-size:12px; margin-bottom:10px;">
       作用范围：${ids.length ? '选中的 ' + ids.length + ' 个书签' : '当前文件夹可见的 ' + targets.length + ' 个书签'}。
-      勾选要应用的清理规则，下方会实时显示效果。
+      每个 Tab 配一条规则，勾上"启用"就会按 Tab 顺序依次应用。
     </p>
-    <div class="rules" id="cleanRules">${rulesHtml}</div>
-    <div class="preview" id="cleanPreview">
-      <div class="preview-row old">
-        <div class="lbl">原始</div>
-        <div class="val" id="previewOld">${esc(sampleNode.title)}</div>
-      </div>
-      <div class="preview-row new">
-        <div class="lbl">清理后</div>
-        <div class="val" id="previewNew"></div>
-      </div>
+    <div class="tabs" id="renameTabs">${tabBarHtml}</div>
+    <div class="tab-panel" id="tabPanel"></div>
+    <div class="preview-wrap">
+      <table class="preview-table" id="previewTable"></table>
     </div>
-    <p style="color:var(--muted); font-size:11px; margin-top:8px;">
-      预览只显示第一条书签的效果，实际应用会作用于全部 ${targets.length} 项。
-    </p>
   `, [
-    { label: '取消', action: closeModal },
+    { label: '取消', action: () => { closeModal(); renderList(); } },
     { label: `应用到 ${targets.length} 项`, primary: true, action: () => {
-        const enabled = new Set();
-        document.querySelectorAll('#cleanRules input[type=checkbox]').forEach(cb => {
-          if (cb.checked) enabled.add(cb.dataset.ruleId);
-        });
-        if (!enabled.size) { alert('请至少勾选一条规则'); return; }
-        let count = 0;
+        const checked = getCheckedPreviewIds();
+        if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
         for (const t of targets) {
-          t.node.title = applyCleanRules(t.node.title, enabled);
-          count++;
+          if (!checked.has(t.node.id)) continue;
+          const idx = targets.indexOf(t);
+          t.node.title = applyAllRules(t.node.title, idx);
         }
         closeModal();
         renderTree(); renderList();
         if (searchQuery) doSearch(searchQuery);
-        setStatus(`已清理 ${count} 个书签标题`);
+        setStatus(`已批量改名 ${checked.size} 个书签`);
       }},
   ]);
 
-  // 绑定实时预览
-  const updatePreview = () => {
-    const enabled = new Set();
-    document.querySelectorAll('#cleanRules input[type=checkbox]').forEach(cb => {
-      if (cb.checked) enabled.add(cb.dataset.ruleId);
-    });
-    document.getElementById('previewNew').textContent = applyCleanRules(sampleNode.title, enabled);
-  };
-  document.querySelectorAll('#cleanRules input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', updatePreview);
+  // 记录预览勾选状态
+  if (!window.__renameChecked) window.__renameChecked = new Map();
+  targets.forEach(t => {
+    if (!window.__renameChecked.has(t.node.id)) window.__renameChecked.set(t.node.id, true);
   });
-  updatePreview();
+
+  renderTabPanel(targets);
+
+  // 绑定 tab 切换
+  document.querySelectorAll('#renameTabs .tab').forEach(el => {
+    el.onclick = () => {
+      // 保存当前面板值
+      saveTabPanel();
+      renameActiveTab = el.dataset.tab;
+      renderTabsHeader(tabs);
+      renderTabPanel(targets);
+    };
+  });
+
+  function renderTabsHeader(tabs) {
+    const bar = document.getElementById('renameTabs');
+    bar.innerHTML = tabs.map(t => {
+      const enabled = renameRule[t.id].enabled;
+      return `<div class="tab ${renameActiveTab === t.id ? 'active' : ''}" data-tab="${t.id}">
+        ${t.label}${enabled ? '<span class="dot"></span>' : ''}
+      </div>`;
+    }).join('');
+    bar.querySelectorAll('.tab').forEach(el => {
+      el.onclick = () => {
+        saveTabPanel();
+        renameActiveTab = el.dataset.tab;
+        renderTabsHeader(tabs);
+        renderTabPanel(targets);
+      };
+    });
+  }
+
+  function saveTabPanel() {
+    const t = renameActiveTab;
+    const r = renameRule[t];
+    const q = (id) => document.getElementById(id);
+    if (t === 'trim') {
+      r.head = q('r-head').value;
+      r.headN = parseInt(q('r-headN').value, 10) || 1;
+      r.tail = q('r-tail').value;
+      r.tailN = parseInt(q('r-tailN').value, 10) || 1;
+      r.caseSensitive = q('r-trimCase').checked;
+      r.emptyIfNotFound = q('r-trimEmpty').checked;
+    } else if (t === 'replace') {
+      r.find = q('r-find').value;
+      r.repl = q('r-repl').value;
+      r.nth = q('r-replNth').value;
+      r.caseSensitive = q('r-replCase').checked;
+    } else if (t === 'del') {
+      r.dir = q('r-delDir').value;
+      r.start = parseInt(q('r-delStart').value, 10) || 1;
+      r.count = parseInt(q('r-delCount').value, 10) || 1;
+    } else if (t === 'number') {
+      r.tpl = q('r-numTpl').value;
+      r.start = parseInt(q('r-numStart').value, 10) || 1;
+      r.step = parseInt(q('r-numStep').value, 10) || 1;
+      r.pad = parseInt(q('r-numPad').value, 10) || 1;
+    } else if (t === 'affix') {
+      r.prefix = q('r-affPrefix').value;
+      r.suffix = q('r-affSuffix').value;
+      r.atN = q('r-affAtN').value;
+    } else if (t === 'regex') {
+      r.pattern = q('r-regexPattern').value;
+      r.repl = q('r-regexRepl').value;
+      r.target = q('r-regexTarget').value;
+    }
+  }
+
+  function renderTabPanel(targets) {
+    const panel = document.getElementById('tabPanel');
+    const r = renameRule[renameActiveTab];
+    const enabled = r.enabled;
+    let html = `<div class="enable-row">
+      <input type="checkbox" id="r-enabled" ${enabled ? 'checked' : ''}>
+      <label for="r-enabled" style="margin:0; color:var(--text); cursor:pointer;">启用此规则</label>
+    </div>`;
+
+    if (renameActiveTab === 'trim') {
+      html += `
+        <div class="panel-row">
+          <div><label>开头锚点（留空=从头）</label>
+            <input type="text" id="r-head" value="${escAttr(r.head)}" placeholder="例如 Download"></div>
+          <div class="small"><label>第几个</label>
+            <input type="number" id="r-headN" value="${r.headN}" min="1"></div>
+        </div>
+        <div class="panel-row">
+          <div><label>结尾锚点（留空=到尾）</label>
+            <input type="text" id="r-tail" value="${escAttr(r.tail)}" placeholder="例如 IMAX"></div>
+          <div class="small"><label>第几个</label>
+            <input type="number" id="r-tailN" value="${r.tailN}" min="1"></div>
+        </div>
+        <div style="display:flex; gap:20px; margin-top:10px;">
+          <label style="display:flex; align-items:center; gap:6px; margin:0; color:var(--text);">
+            <input type="checkbox" id="r-trimCase" ${r.caseSensitive ? 'checked' : ''}> 区分大小写
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; margin:0; color:var(--text);">
+            <input type="checkbox" id="r-trimEmpty" ${r.emptyIfNotFound ? 'checked' : ''}> 找不到锚点时删空标题
+          </label>
+        </div>
+        <p class="hint">例：开头填 <code>Download</code>，结尾填 <code>IMAX</code><br>
+        → <code>Download Wonder Woman 1984 (2020) IMAX Dual Audio {...} - UHDMovies</code><br>
+        → <code>Download Wonder Woman 1984 (2020) IMAX</code></p>
+      `;
+    } else if (renameActiveTab === 'replace') {
+      html += `
+        <div class="panel-row">
+          <div><label>查找</label>
+            <input type="text" id="r-find" value="${escAttr(r.find)}" placeholder="例如 Download"></div>
+          <div><label>替换为（留空=删除）</label>
+            <input type="text" id="r-repl" value="${escAttr(r.repl)}"></div>
+          <div class="small"><label>第几个（空=全部）</label>
+            <input type="number" id="r-replNth" value="${escAttr(r.nth)}" min="1"></div>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; margin-top:10px; color:var(--text);">
+          <input type="checkbox" id="r-replCase" ${r.caseSensitive ? 'checked' : ''}> 区分大小写
+        </label>
+        <p class="hint">例：查找 <code>Download</code>，替换留空 → 删除所有 Download。</p>
+      `;
+    } else if (renameActiveTab === 'del') {
+      html += `
+        <div class="panel-row">
+          <div><label>方向</label>
+            <select id="r-delDir">
+              <option value="head" ${r.dir === 'head' ? 'selected' : ''}>从头</option>
+              <option value="tail" ${r.dir === 'tail' ? 'selected' : ''}>从尾</option>
+            </select></div>
+          <div><label>从第 N 个字符开始</label>
+            <input type="number" id="r-delStart" value="${r.start}" min="1"></div>
+          <div><label>删除 M 个字符</label>
+            <input type="number" id="r-delCount" value="${r.count}" min="1"></div>
+        </div>
+        <p class="hint">例：从头、第 1 个字符开始、删 5 个 → 删掉开头 5 字。</p>
+      `;
+    } else if (renameActiveTab === 'number') {
+      html += `
+        <label>模板（<code>#</code>=序号，<code>&lt;SELF&gt;</code>=原标题）</label>
+        <input type="text" id="r-numTpl" value="${escAttr(r.tpl)}">
+        <div class="panel-row">
+          <div><label>起始</label>
+            <input type="number" id="r-numStart" value="${r.start}"></div>
+          <div><label>步长</label>
+            <input type="number" id="r-numStep" value="${r.step}"></div>
+          <div><label>位数（补零）</label>
+            <input type="number" id="r-numPad" value="${r.pad}" min="1"></div>
+        </div>
+        <p class="hint">例：模板 <code>#. &lt;SELF&gt;</code> → <code>01. 原标题</code>、<code>02. 原标题</code>…</p>
+      `;
+    } else if (renameActiveTab === 'affix') {
+      html += `
+        <div class="panel-row">
+          <div><label>前缀</label>
+            <input type="text" id="r-affPrefix" value="${escAttr(r.prefix)}"></div>
+          <div><label>后缀</label>
+            <input type="text" id="r-affSuffix" value="${escAttr(r.suffix)}"></div>
+        </div>
+        <label>从第 N 个字符位置插入（留空=直接首尾拼接）</label>
+        <input type="number" id="r-affAtN" value="${escAttr(r.atN)}" min="1">
+        <p class="hint">例：前缀填 <code>[YouTube] </code>，留空 N → <code>[YouTube] 原标题</code></p>
+      `;
+    } else if (renameActiveTab === 'regex') {
+      html += `
+        <label>作用范围</label>
+        <select id="r-regexTarget">
+          <option value="title" ${r.target === 'title' ? 'selected' : ''}>仅标题</option>
+          <option value="url" ${r.target === 'url' ? 'selected' : ''}>仅网址</option>
+          <option value="both" ${r.target === 'both' ? 'selected' : ''}>标题和网址</option>
+        </select>
+        <label>正则模式</label>
+        <input type="text" id="r-regexPattern" value="${escAttr(r.pattern)}" placeholder="^Download\\s+(.+)$">
+        <label>替换为（$1 $2 捕获组，留空=删除）</label>
+        <input type="text" id="r-regexRepl" value="${escAttr(r.repl)}" placeholder="$1">
+        <p class="hint">高级用法：不熟悉正则就别用这个 Tab，用「裁剪 / 替换」更直观。</p>
+      `;
+    }
+
+    panel.innerHTML = html;
+
+    // 启用开关
+    document.getElementById('r-enabled').onchange = (e) => {
+      renameRule[renameActiveTab].enabled = e.target.checked;
+      // 更新 tab 圆点
+      const bar = document.getElementById('renameTabs');
+      bar.querySelectorAll('.tab').forEach(el => {
+        const id = el.dataset.tab;
+        const dot = el.querySelector('.dot');
+        if (renameRule[id].enabled && !dot) {
+          const d = document.createElement('span');
+          d.className = 'dot';
+          el.appendChild(d);
+        } else if (!renameRule[id].enabled && dot) {
+          dot.remove();
+        }
+      });
+    };
+    // 输入变化时实时更新预览
+    panel.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('input', () => { saveTabPanel(); refreshPreview(); });
+      el.addEventListener('change', () => { saveTabPanel(); refreshPreview(); });
+    });
+
+    refreshPreview();
+  }
+
+  function refreshPreview() {
+    const table = document.getElementById('previewTable');
+    let html = `<thead><tr>
+      <th class="chk"><input type="checkbox" id="previewAll" checked></th>
+      <th>原始标题</th>
+      <th class="arrow"></th>
+      <th>改后</th>
+    </tr></thead><tbody>`;
+    targets.forEach((t, i) => {
+      const checked = window.__renameChecked.get(t.node.id) !== false;
+      const oldT = t.node.title;
+      const newT = applyAllRules(oldT, i);
+      html += `<tr data-id="${t.node.id}" class="${checked ? '' : 'disabled'}">
+        <td class="chk"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></td>
+        <td class="old" title="${escAttr(oldT)}">${esc(oldT)}</td>
+        <td class="arrow">→</td>
+        <td class="new" title="${escAttr(newT)}">${esc(newT)}</td>
+      </tr>`;
+    });
+    html += '</tbody>';
+    table.innerHTML = html;
+
+    document.getElementById('previewAll').onchange = (e) => {
+      const on = e.target.checked;
+      targets.forEach(t => window.__renameChecked.set(t.node.id, on));
+      refreshPreview();
+    };
+    table.querySelectorAll('.preview-chk').forEach(cb => {
+      cb.onchange = (e) => {
+        window.__renameChecked.set(cb.dataset.id, e.target.checked);
+        const tr = cb.closest('tr');
+        if (e.target.checked) tr.classList.remove('disabled');
+        else tr.classList.add('disabled');
+      };
+    });
+  }
+
+  function getCheckedPreviewIds() {
+    const out = new Set();
+    document.querySelectorAll('#previewTable .preview-chk').forEach(cb => {
+      if (cb.checked) out.add(cb.dataset.id);
+    });
+    return out;
+  }
 }
 
 /* ============================================================
@@ -1563,7 +1841,7 @@ function doSearch(q) {
 }
 
 /* ============================================================
- *  框选
+ *  框选（只在行宽之外的空白区触发）
  * ============================================================ */
 function setupMarquee() {
   const listEl = document.getElementById('list');
@@ -1572,6 +1850,7 @@ function setupMarquee() {
 
   listEl.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    // 点在行内就不框选
     if (e.target.closest('.list-item')) return;
     dragging = true;
     additive = e.ctrlKey || e.metaKey;
@@ -1603,11 +1882,19 @@ function setupMarquee() {
     selectedIds = newSel;
     updateSelectionInfo();
   });
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', (e) => {
     if (!dragging) return;
     dragging = false;
     box.style.display = 'none';
     updateSelectionInfo();
+    // 如果只是单击空白（没有拖动），取消选中
+    if (Math.abs(e.clientX - startX) < 4 && Math.abs(e.clientY - startY) < 4) {
+      if (!additive) {
+        selectedIds.clear();
+        document.querySelectorAll('.list-item.selected').forEach(el => el.classList.remove('selected'));
+        updateSelectionInfo();
+      }
+    }
   });
 }
 
@@ -1648,7 +1935,8 @@ function showContextMenu(x, y, node) {
     });
   }
   sep();
-  add('💾 导出选中项为 HTML', () => exportSelected(), false);
+  add('💾 导出选中项为 HTML', () => exportSelected());
+  add('✏️ 批量改名', () => openRenameDialog());
   sep();
   if (selectedIds.size > 1) {
     add(`🗑 删除选中的 ${selectedIds.size} 项`, deleteSelected, true);
@@ -1672,7 +1960,7 @@ document.addEventListener('click', hideContextMenu);
  * ============================================================ */
 function showModal(title, bodyHtml, buttons = [{ label: '关闭', action: closeModal }]) {
   const box = document.getElementById('modalBox');
-  box.innerHTML = `<h3>${title}</h3><div>${bodyHtml}</div>`;
+  box.innerHTML = `<h3>${title}</h3><div style="flex:1; overflow:auto; display:flex; flex-direction:column;">${bodyHtml}</div>`;
   const actions = document.createElement('div');
   actions.className = 'modal-actions';
   for (const b of buttons) {
@@ -1695,10 +1983,10 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.5.0</b> · 新增「✂️ 清理标题」（预设规则可勾选、实时预览、无需正则）<br>
-      <b>v1.4.0</b> · 重写列宽逻辑、缩短 padding、批量编辑简化为纯正则<br>
-      <b>v1.3.1</b> · Delete 可删树文件夹、F2 内联重命名<br>
-      <b>v1.3.0</b> · 全部折叠/展开、列表拖入文件夹、导出选中、查找重复<br>
+      <b>v1.6.0</b> · 批量改名（Tab 式 6 种规则可叠加、实时预览、逐条勾选）、行高亮只到列尾、右侧空白可框选<br>
+      <b>v1.5.0</b> · 预设清理标题（已废弃）<br>
+      <b>v1.4.0</b> · 重写列宽逻辑、缩短 padding<br>
+      <b>v1.3.1</b> · Delete 可删树状文件夹、F2 内联重命名<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理
     </p>
   `);
@@ -1759,7 +2047,7 @@ document.getElementById('btnNewBookmark').onclick = createBookmark;
 document.getElementById('btnDelete').onclick = deleteSelected;
 document.getElementById('btnFindDup').onclick = findDupDialog;
 document.getElementById('btnCheck').onclick = checkLinks;
-document.getElementById('btnClean').onclick = openCleanDialog;
+document.getElementById('btnRename').onclick = openRenameDialog;
 document.getElementById('btnAbout').onclick = showAbout;
 document.getElementById('btnFoldAll').onclick = () => collapseAll(true);
 document.getElementById('btnUnfoldAll').onclick = () => collapseAll(false);
