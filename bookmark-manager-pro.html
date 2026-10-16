@@ -280,20 +280,17 @@
     border: 1px solid var(--border); border-radius: 6px;
     overflow: auto; margin-top: 12px;
     flex: 1 1 auto; min-height: 120px;
-    background: var(--bg); position: relative;
-    display: flex; flex-direction: column;
+    background: var(--bg);
   }
   .preview-inner {
-    display: inline-block;
-    min-width: 100%;
-    width: max-content;
-    vertical-align: top;
+    width: 100%;
   }
   .preview-table {
     border-collapse: collapse; font-size: 12px;
     table-layout: fixed;
-    min-width: 100%;
+    width: 100%;
   }
+  .preview-table col.chk-col { width: 34px; }
   .preview-table th, .preview-table td {
     border: 1px solid var(--border);
     padding: 4px 6px;
@@ -1805,7 +1802,7 @@ function openRenameDialog() {
   });
 
   // 预览列宽（chk 固定，old/new 可拖）
-  if (!window.__previewColWidths) window.__previewColWidths = { old: 380, new: 380 };
+  if (!window.__previewColWidths) window.__previewColWidths = { old: 50, new: 50 };
 
   const box = document.getElementById('modalBox');
   document.getElementById('modalMask').classList.add('show');
@@ -2113,23 +2110,20 @@ function openRenameDialog() {
       return true;
     });
 
-    const wOld = window.__previewColWidths.old;
-    const wNew = window.__previewColWidths.new;
+    const wOld = window.__previewColWidths.old;   // 百分比数字，如 50
+    const wNew = window.__previewColWidths.new;   // 百分比数字，如 50
 
-    let html = '<table class="preview-table"><thead><tr>';
-    html += `<th class="chk-col" style="width:34px">`;
-    html += `<input type="checkbox" id="previewCheckAll" checked>`;
-    html += `</th>`;
-    html += `<th class="old-col" style="width:${wOld}px">`;
-    html += `<span style="display:inline-flex;align-items:center;width:100%;">`;
-    html += `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">原始标题</span>`;
-    html += `<span class="splitter" data-pkey="old" style="display:inline-block;width:5px;height:14px;cursor:col-resize;background:transparent;position:relative;flex-shrink:0;"></span>`;
-    html += `</span></th>`;
-    html += `<th class="new-col" style="width:${wNew}px">`;
-    html += `<span style="display:inline-flex;align-items:center;width:100%;">`;
-    html += `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">改后标题</span>`;
-    html += `<span class="splitter" data-pkey="new" style="display:inline-block;width:5px;height:14px;cursor:col-resize;background:transparent;position:relative;flex-shrink:0;"></span>`;
-    html += `</span></th>`;
+    let html = '<table class="preview-table">';
+    html += `<colgroup>`;
+    html += `<col class="chk-col">`;
+    html += `<col data-pkey="old" style="width:${wOld}%">`;
+    html += `<col data-pkey="new" style="width:${wNew}%">`;
+    html += `</colgroup>`;
+
+    html += '<thead><tr>';
+    html += `<th class="chk-col"><input type="checkbox" id="previewCheckAll" checked></th>`;
+    html += `<th class="old-col" data-pkey="old">原始标题<span class="splitter" data-pkey="old"></span></th>`;
+    html += `<th class="new-col" data-pkey="new">改后标题<span class="splitter" data-pkey="new"></span></th>`;
     html += '</tr></thead><tbody>';
 
     let folderIdx = 0, bmIdx = 0;
@@ -2143,8 +2137,8 @@ function openRenameDialog() {
 
       html += `<tr class="${checked ? '' : 'disabled'}" data-id="${t.node.id}">`;
       html += `<td class="chk-col"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></td>`;
-      html += `<td class="old-col" style="width:${wOld}px" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</td>`;
-      html += `<td class="new-col" style="width:${wNew}px" title="${escAttr(newT)}">${esc(folderMark + newT)}</td>`;
+      html += `<td class="old-col" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</td>`;
+      html += `<td class="new-col" title="${escAttr(newT)}">${esc(folderMark + newT)}</td>`;
       html += '</tr>';
     });
 
@@ -2176,20 +2170,33 @@ function openRenameDialog() {
       };
     });
 
-    // 列宽拖拽
+    // 列宽拖拽（按百分比改）
     previewInnerEl.querySelectorAll('th .splitter').forEach(sp => {
       sp.onmousedown = (e) => {
         e.preventDefault();
         e.stopPropagation();
         const key = sp.dataset.pkey;
+        const other = key === 'old' ? 'new' : 'old';
+        const tableEl = previewInnerEl.querySelector('.preview-table');
+        const tableWidth = tableEl ? tableEl.getBoundingClientRect().width : 800;
+        const chkW = 34;
+        const usable = Math.max(100, tableWidth - chkW); // 两个文本列可用的总宽
         const startX = e.clientX;
         const startW = window.__previewColWidths[key];
+
         const onMove = (ev) => {
-          let w = startW + (ev.clientX - startX);
-          if (w < 60) w = 60;
-          if (w > 1200) w = 1200;
-          window.__previewColWidths[key] = w;
-          previewInnerEl.querySelectorAll(`[data-pkey="${key}"]`).forEach(el => el.style.width = w + 'px');
+          const dx = ev.clientX - startX;
+          const dPct = (dx / usable) * 100;
+          let w1 = startW + dPct;
+          if (w1 < 10) w1 = 10;
+          if (w1 > 90) w1 = 90;
+          const w2 = 100 - w1;
+          window.__previewColWidths[key] = w1;
+          window.__previewColWidths[other] = w2;
+          const col1 = previewInnerEl.querySelector(`col[data-pkey="${key}"]`);
+          const col2 = previewInnerEl.querySelector(`col[data-pkey="${other}"]`);
+          if (col1) col1.style.width = w1 + '%';
+          if (col2) col2.style.width = w2 + '%';
         };
         const onUp = () => {
           document.removeEventListener('mousemove', onMove);
