@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.8.0</title>
-<!-- 书签管理器 Pro v1.8.0 | 2026-10-16 -->
+<title>书签管理器 Pro v1.8.1</title>
+<!-- 书签管理器 Pro v1.8.1 | 2026-10-16 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -282,43 +282,69 @@
     flex: 1 1 auto; min-height: 120px;
     background: var(--bg);
   }
-  .preview-inner {
-    width: 100%;
-  }
+  .preview-inner { width: 100%; }
   .preview-table {
     border-collapse: collapse; font-size: 12px;
     table-layout: fixed;
     width: 100%;
+    table-layout: fixed;
   }
   .preview-table col.chk-col { width: 34px; }
-  .preview-table th, .preview-table td {
-    border: 1px solid var(--border);
-    padding: 4px 6px;
+  /* 单元格：只保留行分隔线，列分隔线交给 splitter 视觉 */
+  .preview-table td {
+    border: none;
+    border-bottom: 1px solid var(--border);
+    padding: 4px 8px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     text-align: left; vertical-align: middle;
   }
+  /* 表头：Windows 资源管理器风格（浅灰底、下边框、可点） */
   .preview-table th {
-    position: sticky; top: 0; background: var(--panel2); color: var(--muted);
-    font-weight: normal; z-index: 1; height: 26px;
+    position: sticky; top: 0;
+    background: var(--panel2);
+    color: var(--muted);
+    font-weight: normal;
+    font-size: 11px;
+    height: 28px;
+    padding: 0 8px;
+    text-align: left;
+    vertical-align: middle;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    z-index: 1;
+    user-select: none;
   }
-  .preview-table th.chk-col, .preview-table td.chk-col {
-    width: 34px; min-width: 34px; max-width: 34px;
-    text-align: center; padding: 4px 0;
+  .preview-table th .th-inner {
+    display: flex; align-items: center; gap: 4px;
+    width: 100%; height: 100%;
   }
-  .preview-table th.old-col, .preview-table td.old-col {
-    color: var(--muted); max-width: 0;
+  .preview-table th .th-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 表头右侧的 splitter 手柄 */
+  .preview-table th .th-splitter {
+    flex-shrink: 0;
+    width: 8px; height: 100%;
+    cursor: col-resize;
+    position: relative;
+    margin-right: -8px;
   }
-  .preview-table th.new-col, .preview-table td.new-col {
-    color: var(--ok); font-weight: 500; max-width: 0;
-  }
-  .preview-table tr.disabled td.new-col { color: var(--muted); text-decoration: line-through; }
-  .preview-table th .splitter::after {
-    content: ''; position: absolute; left: 2px; top: -3px; bottom: -3px;
+  .preview-table th .th-splitter::before {
+    content: ''; position: absolute;
+    left: 3px; top: 6px; bottom: 6px;
     width: 1px; background: var(--border);
   }
-  .preview-table th .splitter:hover::after {
-    background: var(--accent); width: 2px; left: 1.5px;
+  .preview-table th .th-splitter:hover::before,
+  .preview-table th .th-splitter.dragging::before {
+    background: var(--accent); width: 2px; left: 2.5px;
   }
+  /* 复选框列 */
+  .preview-table th.chk-col, .preview-table td.chk-col {
+    text-align: center; padding: 4px 0;
+  }
+  /* 文本列 */
+  .preview-table td.old-col { color: var(--muted); }
+  .preview-table td.new-col { color: var(--ok); font-weight: 500; }
+  .preview-table tr.disabled td.new-col { color: var(--muted); text-decoration: line-through; }
 
   /* 去重弹窗左右布局 */
   .dup-layout { display: flex; gap: 12px; flex: 1; min-height: 320px; overflow: hidden; }
@@ -395,7 +421,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.8.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.8.1</span>
   </div>
 </div>
 
@@ -445,7 +471,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.8.1';
 
 /* ============================================================
  *  数据模型
@@ -2122,8 +2148,18 @@ function openRenameDialog() {
 
     html += '<thead><tr>';
     html += `<th class="chk-col"><input type="checkbox" id="previewCheckAll" checked></th>`;
-    html += `<th class="old-col" data-pkey="old">原始标题<span class="splitter" data-pkey="old"></span></th>`;
-    html += `<th class="new-col" data-pkey="new">改后标题<span class="splitter" data-pkey="new"></span></th>`;
+    html += `<th class="old-col">`;
+    html += `  <div class="th-inner">`;
+    html += `    <span class="th-label">原始标题</span>`;
+    html += `    <span class="th-splitter" data-pkey="old"></span>`;
+    html += `  </div>`;
+    html += `</th>`;
+    html += `<th class="new-col">`;
+    html += `  <div class="th-inner">`;
+    html += `    <span class="th-label">改后标题</span>`;
+    html += `    <span class="th-splitter" data-pkey="new"></span>`;
+    html += `  </div>`;
+    html += `</th>`;
     html += '</tr></thead><tbody>';
 
     let folderIdx = 0, bmIdx = 0;
@@ -2170,8 +2206,8 @@ function openRenameDialog() {
       };
     });
 
-    // 列宽拖拽（按百分比改）
-    previewInnerEl.querySelectorAll('th .splitter').forEach(sp => {
+    // 列宽拖拽（按百分比改，selector 改成 .th-splitter）
+    previewInnerEl.querySelectorAll('th .th-splitter').forEach(sp => {
       sp.onmousedown = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2180,9 +2216,11 @@ function openRenameDialog() {
         const tableEl = previewInnerEl.querySelector('.preview-table');
         const tableWidth = tableEl ? tableEl.getBoundingClientRect().width : 800;
         const chkW = 34;
-        const usable = Math.max(100, tableWidth - chkW); // 两个文本列可用的总宽
+        const usable = Math.max(100, tableWidth - chkW);
         const startX = e.clientX;
         const startW = window.__previewColWidths[key];
+
+        sp.classList.add('dragging');
 
         const onMove = (ev) => {
           const dx = ev.clientX - startX;
@@ -2199,6 +2237,7 @@ function openRenameDialog() {
           if (col2) col2.style.width = w2 + '%';
         };
         const onUp = () => {
+          sp.classList.remove('dragging');
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
         };
@@ -2426,6 +2465,7 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
+      <b>v1.8.1</b> · 批量改名预览表铺满容器不溢出、表头改 Windows 风格、原始/改后列可拖<br>
       <b>v1.8.0</b> · 树状栏去掉多余根行、默认全部折叠；面包屑导航（祖先灰/当前亮、可点击跳转）；全局排序开关；批量改名预览表改为 3 列网格 + 支持撤销/重做；查找重复改为左右布局 + 组内单选保留；图标列固定不可拖<br>
       <b>v1.7.1</b> · 修复批量改名弹窗 tab 无法点击、预览区空白<br>
       <b>v1.7.0</b> · 侧边栏可拖（磁吸 280px）、树状栏单击展开+切换、主列表横向滚动、批量改名弹窗 16:9 可拉伸 + 应用到文件夹/书签<br>
