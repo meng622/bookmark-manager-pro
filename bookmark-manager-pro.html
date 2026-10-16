@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.9.0</title>
-<!-- 书签管理器 Pro v1.9.0 | 2026-10-16 -->
+<title>书签管理器 Pro v1.9.1</title>
+<!-- 书签管理器 Pro v1.9.1 | 2026-10-16 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -408,7 +408,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.9.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.9.1</span>
   </div>
 </div>
 
@@ -455,7 +455,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.9.1';
 
 /* ============================================================
  *  数据模型
@@ -1180,12 +1180,38 @@ function applySort(items) {
     const aIsFolder = a.type === 'folder' ? 0 : 1;
     const bIsFolder = b.type === 'folder' ? 0 : 1;
     if (aIsFolder !== bIsFolder) return aIsFolder - bIsFolder;
-    // 类型内部按列值
+    // 类型内部按列值，用自定义顺序：符号 > 数字 > 英文 > 中文
     const va = getVal(a), vb = getVal(b);
-    if (va < vb) return -1 * d;
-    if (va > vb) return 1 * d;
-    return 0;
+    const c = smartCompare(va, vb);
+    return c * d;
   });
+}
+
+/* 自定义排序：符号 > 数字 > 英文 > 中文 */
+function smartCompare(a, b) {
+  a = String(a || ''); b = String(b || '');
+  const ca = charClass(a), cb = charClass(b);
+  if (ca !== cb) return ca - cb;  // 大类不同 → 按大类排
+  // 同类内部用 Intl.Collator 自然排（数字识别、大小写不敏感、中文拼音）
+  const collator = new Intl.Collator('zh-Hans-CN', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+  return collator.compare(a, b);
+}
+function charClass(s) {
+  if (!s) return 4;
+  const c = s.codePointAt(0);
+  // 符号：ASCII 可见非字母数字，以及常见符号区
+  if (c >= 0x20 && c < 0x30) return 0;                 // 空格 ~ /
+  if (c >= 0x3A && c < 0x41) return 0;                 // : ~ @
+  if (c >= 0x5B && c < 0x61) return 0;                 // [ ~ `
+  if (c >= 0x7B && c < 0x7F) return 0;                 // { ~ ~
+  if (c < 0x20) return 0;                              // 控制字符
+  if (c >= 0x30 && c <= 0x39) return 1;                // 数字 0-9
+  if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) return 2; // 英文
+  if (c >= 0x80) return 3;                             // 中文 / 其它非 ASCII
+  return 4;
 }
 
 /* ============================================================
@@ -1774,6 +1800,9 @@ function applyAllRules(title, index, type) {
 }
 
 function openRenameDialog() {
+  // 每次打开弹窗都清空撤销/重做历史，避免残留
+  renameUndoStack = [];
+  renameRedoStack = [];
   const ids = [...selectedIds];
   const listItems = searchQuery ? currentSearchResults : getVisibleItems();
   let targets;
@@ -1866,7 +1895,10 @@ function openRenameDialog() {
   document.getElementById('renameApply').onclick = () => {
     const checked = getCheckedPreviewIds();
     if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
-    const history = [];
+    // 快照当前状态
+    renameUndoStack.push(JSON.stringify(root));
+    renameRedoStack = [];
+
     let folderIdx = 0, bmIdx = 0, cnt = 0;
     for (const t of targets) {
       const type = t.node.type;
@@ -1874,49 +1906,52 @@ function openRenameDialog() {
       if (type === 'bookmark' && !renameScope.bookmarks) continue;
       if (!checked.has(t.node.id)) continue;
       const idx = type === 'folder' ? folderIdx++ : bmIdx++;
-      const oldTitle = t.node.title;
       t.node.title = applyAllRules(t.node.title, idx, type);
-      if (t.node.title !== oldTitle) {
-        history.push({ id: t.node.id, oldTitle, newTitle: t.node.title });
-      }
       cnt++;
     }
-    if (history.length) {
-      renameUndoStack.push(history);
-      renameRedoStack = [];
-    }
-    closeModal();
     renderTree(); renderList();
     if (searchQuery) doSearch(searchQuery);
+    refreshPreview();
     setStatus(`已批量改名 ${cnt} 个项，可点「↶ 撤销」撤回`);
+    updateUndoRedoButtons();
   };
   undoBtn.onclick = () => {
     if (!renameUndoStack.length) return;
-    const history = renameUndoStack.pop();
-    for (const h of history) {
-      const r = findById(h.id);
-      if (r) r.node.title = h.oldTitle;
+    // 当前状态推入重做栈
+    renameRedoStack.push(JSON.stringify(root));
+    // 从撤销栈恢复
+    root = JSON.parse(renameUndoStack.pop());
+    // 刷新界面 + 重新绑定 targets（因为 root 是新对象了）
+    if (currentFolder) {
+      const found = findById(currentFolder.id);
+      currentFolder = found ? found.node : root;
     }
-    renameRedoStack.push(history);
+    targets = (selectedIds.size
+      ? [...selectedIds].map(id => findById(id)).filter(x => x && x.node !== root)
+      : (currentFolder ? currentFolder.children : []).map(n => ({ node: n })));
     renderTree(); renderList();
     if (searchQuery) doSearch(searchQuery);
-    setStatus(`已撤销 ${history.length} 项改动`);
+    refreshPreview();
+    setStatus('已撤销');
     updateUndoRedoButtons();
   };
   redoBtn.onclick = () => {
     if (!renameRedoStack.length) return;
-    const history = renameRedoStack.pop();
-    for (const h of history) {
-      const r = findById(h.id);
-      if (r) r.node.title = h.newTitle;
+    renameUndoStack.push(JSON.stringify(root));
+    root = JSON.parse(renameRedoStack.pop());
+    if (currentFolder) {
+      const found = findById(currentFolder.id);
+      currentFolder = found ? found.node : root;
     }
-    renameUndoStack.push(history);
+    targets = (selectedIds.size
+      ? [...selectedIds].map(id => findById(id)).filter(x => x && x.node !== root)
+      : (currentFolder ? currentFolder.children : []).map(n => ({ node: n })));
     renderTree(); renderList();
     if (searchQuery) doSearch(searchQuery);
-    setStatus(`已重做 ${history.length} 项改动`);
+    refreshPreview();
+    setStatus('已重做');
     updateUndoRedoButtons();
   };
-  updateUndoRedoButtons();
 
   function renderTabs() {
     tabBarEl.innerHTML = tabs.map(t => {
@@ -2225,6 +2260,7 @@ function openRenameDialog() {
   renderTabs();
   renderTabPanel();
   refreshPreview();
+  updateUndoRedoButtons();
 }
 
 /* ============================================================
@@ -2293,6 +2329,12 @@ function setupMarquee() {
 
   listEl.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    // 若正在内联编辑，先提交编辑，不进入框选
+    if (editingId) {
+      const input = document.querySelector('.inline-edit');
+      if (input) input.blur();   // 触发 commitInlineEdit
+      return;
+    }
     if (e.target.closest('.list-item')) return;
     dragging = true;
     additive = e.ctrlKey || e.metaKey;
@@ -2432,15 +2474,16 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.9.0</b> · 去掉全局排序开关（每文件夹独立记）；排序时文件夹永远在前；列表右侧留 60px 空气区支持框选<br>
-      <b>v1.8.1</b> · 批量改名预览表铺满容器不溢出、表头改 Windows 风格、原始/改后列可拖<br>
-      <b>v1.8.0</b> · 树状栏去多余根行+默认折叠、面包屑导航、批量改名3列网格+撤销重做、查找重复左右布局<br>
-      <b>v1.7.1</b> · 修复批量改名弹窗 tab 无法点击、预览区空白<br>
-      <b>v1.7.0</b> · 侧边栏可拖（磁吸280px）、树单击展开+切换、主列表横向滚动<br>
-      <b>v1.6.0</b> · 批量改名（Tab 式 6 种规则可叠加、逐条勾选、实时预览）<br>
-      <b>v1.5.0</b> · 预设清理标题<br>
-      <b>v1.4.0</b> · 重写列宽逻辑、缩短 padding<br>
-      <b>v1.3.1</b> · splitter 钳制、Delete 删树文件夹、F2 内联重命名<br>
+      <b>v1.9.1</b> · 排序改符号>数字>英文>中文、批量改名应用不关窗；fix: 内联改名点空白即提交；refactor: 撤销/重做整树快照+跨弹窗清空
+      v1.9.0 · 去掉全局排序开关（每文件夹独立记）；排序时文件夹永远在前；列表右侧留 60px 空气区支持框选<br>
+      v1.8.1 · 批量改名预览表铺满容器不溢出、表头改 Windows 风格、原始/改后列可拖<br>
+      v1.8.0 · 树状栏去多余根行+默认折叠、面包屑导航、批量改名3列网格+撤销重做、查找重复左右布局<br>
+      v1.7.1 · 修复批量改名弹窗 tab 无法点击、预览区空白<br>
+      v1.7.0 · 侧边栏可拖（磁吸280px）、树单击展开+切换、主列表横向滚动<br>
+      v1.6.0 · 批量改名（Tab 式 6 种规则可叠加、逐条勾选、实时预览）<br>
+      v1.5.0 · 预设清理标题<br>
+      v1.4.0 · 重写列宽逻辑、缩短 padding<br>
+      v1.3.1 · splitter 钳制、Delete 删树文件夹、F2 内联重命名<br>
       v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
     </p>
   `);
