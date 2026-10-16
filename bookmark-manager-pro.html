@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.7.1</title>
-<!-- 书签管理器 Pro v1.7.1 | 2026-10-15 -->
+<title>书签管理器 Pro v1.8.0</title>
+<!-- 书签管理器 Pro v1.8.0 | 2026-10-16 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -35,6 +35,8 @@
   button.danger:hover { background: var(--danger); border-color: var(--danger); }
   button.primary { background: var(--accent); border-color: var(--accent); color:#fff; }
   button.primary:hover { filter: brightness(1.1); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button:disabled:hover { background: var(--panel2); border-color: var(--border); color: var(--text); }
   input[type=text], input[type=search], input[type=number], select {
     background: var(--bg); color: var(--text); border: 1px solid var(--border);
     padding: 5px 8px; border-radius: 5px; font-size: 12px; outline: none;
@@ -42,7 +44,6 @@
   input:focus, select:focus { border-color: var(--accent); }
   .main { flex: 1; display: flex; overflow: hidden; }
 
-  /* 侧边栏：宽度由 JS 控制，右侧有一条可拖拽的分隔条 */
   .sidebar {
     width: 280px; min-width: 180px; max-width: 600px;
     background: var(--panel);
@@ -80,7 +81,6 @@
   .tree-row.active .count { color: #ddd; }
   .tree-children { margin-left: 14px; }
 
-  /* 侧边栏拖拽分隔线（唯一一条，紧贴 sidebar 右侧） */
   #sidebarSplitter {
     width: 6px; cursor: col-resize; flex-shrink: 0;
     background: var(--bg); position: relative;
@@ -100,12 +100,24 @@
     padding: 8px 12px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 10px; background: var(--panel);
   }
-  .content-header h2 { font-size: 14px; font-weight: 600; flex: 1; }
-  /* 列表容器允许横向滚动 */
+  /* 面包屑 */
+  .breadcrumb { flex: 1; display: flex; align-items: center; gap: 4px;
+    overflow: hidden; font-size: 14px; }
+  .breadcrumb .crumb { color: var(--muted); cursor: pointer; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .breadcrumb .crumb:hover { color: var(--text); text-decoration: underline; }
+  .breadcrumb .crumb.current { color: var(--text); font-weight: 600; cursor: default; }
+  .breadcrumb .crumb.current:hover { text-decoration: none; }
+  .breadcrumb .sep { color: var(--muted); flex-shrink: 0; }
+
   .list-header-scroll {
     overflow-x: hidden; overflow-y: hidden;
     background: var(--panel2); border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: stretch;
+  }
+  .list-header-wrap {
+    flex: 1; overflow: hidden;
   }
   .list-header {
     display: flex; align-items: stretch;
@@ -135,7 +147,16 @@
   body.col-resizing { cursor: col-resize !important; }
   body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
 
-  /* 列表：主区，允许横向滚动 */
+  /* 全局排序开关 */
+  .global-sort-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 10px; border-left: 1px solid var(--border);
+    font-size: 11px; color: var(--muted); flex-shrink: 0;
+    cursor: pointer;
+  }
+  .global-sort-bar:hover { color: var(--text); background: var(--border); }
+  .global-sort-bar input { cursor: pointer; }
+
   .list {
     flex: 1; overflow: auto; padding: 0; position: relative;
   }
@@ -146,7 +167,6 @@
     width: max-content; min-width: 100%;
   }
   .list-item:hover { background: var(--panel2); }
-  /* 关键：高亮只覆盖到列尾。用内部一个包裹层控制高亮宽度 */
   .list-item > .row-inner {
     display: flex; align-items: center;
     padding: 0;
@@ -218,7 +238,6 @@
   .modal input[type=checkbox] { width: auto; }
   .modal code { background: var(--bg); padding: 1px 5px; border-radius: 3px; color: var(--accent2); }
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-shrink: 0; }
-  /* 拉伸小手柄 */
   .modal-resize-hint {
     position: absolute; right: 2px; bottom: 2px; width: 14px; height: 14px;
     pointer-events: none;
@@ -227,7 +246,6 @@
     opacity: .6;
   }
 
-  /* Tab 栏 */
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 12px; flex-shrink: 0; }
   .tab {
     padding: 7px 14px; cursor: pointer; font-size: 13px;
@@ -246,7 +264,6 @@
     background: var(--ok); margin-left: 6px; vertical-align: middle;
   }
   .tab-panel { flex-shrink: 0; overflow: auto; padding-right: 4px; }
-  .tab-panel.hidden { display: none; }
   .panel-row { display: flex; gap: 8px; align-items: flex-end; margin-top: 6px; }
   .panel-row > div { flex: 1; }
   .panel-row .small { flex: 0 0 90px; }
@@ -258,47 +275,76 @@
   .hint { color: var(--muted); font-size: 11px; line-height: 1.7; margin-top: 10px; }
   .hint code { background: #11111b; }
 
-  /* 预览表（Windows 逻辑：可横向滚动、列宽可拖、行高亮只到列尾） */
+  /* 预览表：3 列固定结构（chk / old / new），带网格边框 */
   .preview-wrap {
     border: 1px solid var(--border); border-radius: 6px;
     overflow: auto; margin-top: 12px; flex: 1; min-height: 120px;
     background: var(--bg); position: relative;
   }
   .preview-inner { display: inline-block; min-width: 100%; vertical-align: top; }
-  .preview-header {
-    display: flex; align-items: stretch; position: sticky; top: 0;
-    background: var(--panel2); color: var(--muted); z-index: 1;
-    border-bottom: 1px solid var(--border); height: 26px;
+  .preview-table {
+    border-collapse: collapse; font-size: 12px;
+    width: max-content;
   }
-  .preview-header .pcol {
-    display: flex; align-items: center; padding: 0 6px;
-    overflow: hidden; white-space: nowrap; flex-shrink: 0;
-    font-size: 11px; cursor: pointer;
+  .preview-table th, .preview-table td {
+    border: 1px solid var(--border);
+    padding: 4px 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-align: left; vertical-align: middle;
   }
-  .preview-header .pcol.chk-col { justify-content: center; cursor: default; }
-  .preview-header .pcol:hover { background: var(--border); color: var(--text); }
-  .preview-row {
-    display: flex; align-items: center; font-size: 12px;
-    width: max-content; min-width: 100%;
+  .preview-table th {
+    position: sticky; top: 0; background: var(--panel2); color: var(--muted);
+    font-weight: normal; z-index: 1; height: 26px;
   }
-  .preview-row:hover { background: var(--panel2); }
-  .preview-row.disabled { opacity: .5; }
-  .preview-row > .row-inner { display: flex; align-items: center; }
-  .preview-row .pcol {
-    padding: 4px 6px; overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; flex-shrink: 0;
+  .preview-table th.chk-col, .preview-table td.chk-col {
+    width: 34px; min-width: 34px; max-width: 34px;
+    text-align: center; padding: 4px 0;
   }
-  .preview-row .pcol.chk-col { text-align: center; }
-  .preview-row .pcol.old { color: var(--muted); }
-  .preview-row .pcol.arrow { text-align: center; color: var(--muted); }
-  .preview-row .pcol.new { color: var(--ok); font-weight: 500; }
-  .preview-row.disabled .pcol.new { color: var(--muted); text-decoration: line-through; }
+  .preview-table th.old-col, .preview-table td.old-col {
+    color: var(--muted); max-width: 0;
+  }
+  .preview-table th.new-col, .preview-table td.new-col {
+    color: var(--ok); font-weight: 500; max-width: 0;
+  }
+  .preview-table tr.disabled td.new-col { color: var(--muted); text-decoration: line-through; }
+  .preview-table .arrow { color: var(--muted); text-align: center; }
 
-  .log-box {
-    background: #11111b; border: 1px solid var(--border); border-radius: 6px;
-    padding: 10px 12px; font-family: Consolas, "Courier New", monospace;
-    font-size: 11.5px; line-height: 1.6; max-height: 380px; overflow: auto;
-    white-space: pre-wrap; word-break: break-all; color: #cdd6f4;
+  /* 去重弹窗左右布局 */
+  .dup-layout { display: flex; gap: 12px; flex: 1; min-height: 320px; overflow: hidden; }
+  .dup-left {
+    flex: 1; min-width: 0; overflow: auto;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
+  }
+  .dup-right {
+    flex: 1; min-width: 0; overflow: auto;
+    border: 1px solid var(--border); border-radius: 6px; background: #11111b;
+    font-family: Consolas, monospace; font-size: 11.5px; line-height: 1.6;
+    padding: 10px 12px; white-space: pre-wrap; word-break: break-all;
+    color: #cdd6f4;
+  }
+  .dup-group {
+    border-bottom: 1px solid var(--border); padding: 8px 10px;
+  }
+  .dup-group:last-child { border-bottom: none; }
+  .dup-group .group-header {
+    font-size: 11px; color: var(--muted); margin-bottom: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .dup-row {
+    display: flex; align-items: center; gap: 8px; padding: 3px 0;
+    cursor: pointer; font-size: 12px;
+  }
+  .dup-row input[type=radio] { cursor: pointer; flex-shrink: 0; }
+  .dup-row .dup-title {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+    min-width: 0;
+  }
+  .dup-row.keep .dup-title { color: var(--ok); }
+  .dup-row.del .dup-title { color: var(--danger); text-decoration: line-through; }
+  .dup-row .dup-path {
+    color: var(--muted); font-size: 10px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    flex: 0 0 auto; max-width: 40%;
   }
 
   .statusbar {
@@ -338,7 +384,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.7.0</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.8.0</span>
   </div>
 </div>
 
@@ -357,12 +403,16 @@
   <div id="sidebarSplitter" title="拖动调整宽度"></div>
   <div class="content">
     <div class="content-header">
-      <h2 id="folderTitle">未导入</h2>
-      <span id="folderPath" style="color:var(--muted); font-size:11px;"></span>
+      <div class="breadcrumb" id="breadcrumb"></div>
       <button id="btnSelectAll" style="display:none;">全选</button>
     </div>
-    <div class="list-header-scroll" id="listHeaderScroll">
-      <div class="list-header" id="listHeader"></div>
+    <div class="list-header-scroll">
+      <div class="list-header-wrap" id="listHeaderWrap">
+        <div class="list-header" id="listHeader"></div>
+      </div>
+      <label class="global-sort-bar" title="勾选后所有文件夹共用同一个排序">
+        <input type="checkbox" id="globalSort"> 全局排序
+      </label>
     </div>
     <div class="list" id="list"><div class="list-inner" id="listInner"></div></div>
   </div>
@@ -384,7 +434,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.8.0';
 
 /* ============================================================
  *  数据模型
@@ -397,8 +447,42 @@ let uidCounter = 0;
 let editingId = null;
 const uid = () => 'n' + (++uidCounter) + '_' + Date.now().toString(36);
 
-let sortState = { key: null, dir: 1 };
+// 排序状态：每个文件夹独立 { folderId: {key, dir} }
+// 全局开关打开时使用 globalSortState
+let folderSortStates = {};
+let globalSortState = { key: null, dir: 1 };
+let globalSortEnabled = false;
 
+// 当前的排序状态（读取函数）
+function currentSortKey() {
+  if (globalSortEnabled) return globalSortState.key;
+  if (!currentFolder) return null;
+  const s = folderSortStates[currentFolder.id];
+  return s ? s.key : null;
+}
+function currentSortDir() {
+  if (globalSortEnabled) return globalSortState.dir;
+  if (!currentFolder) return 1;
+  const s = folderSortStates[currentFolder.id];
+  return s ? s.dir : 1;
+}
+
+// 侧边栏宽度
+const SIDEBAR_DEFAULT = 280;
+const SIDEBAR_MIN = 180;
+const SIDEBAR_MAX = 600;
+const SIDEBAR_SNAP = 12;
+let sidebarWidth = loadSidebarWidth();
+function loadSidebarWidth() {
+  const v = parseInt(localStorage.getItem('bm_sidebar_width'), 10);
+  if (!isNaN(v) && v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) return v;
+  return SIDEBAR_DEFAULT;
+}
+function saveSidebarWidth(w) {
+  try { localStorage.setItem('bm_sidebar_width', String(w)); } catch (e) {}
+}
+
+// 列宽
 const DEFAULT_COLS = {
   '__fav': 22,
   'title': 260,
@@ -406,7 +490,6 @@ const DEFAULT_COLS = {
   'status': 64,
 };
 let colWidths = loadColWidths();
-
 function loadColWidths() {
   try {
     const s = localStorage.getItem('bm_col_widths_v3');
@@ -416,21 +499,6 @@ function loadColWidths() {
 }
 function saveColWidths() {
   try { localStorage.setItem('bm_col_widths_v3', JSON.stringify(colWidths)); } catch (e) {}
-}
-
-// 侧边栏宽度
-const SIDEBAR_DEFAULT = 280;
-const SIDEBAR_MIN = 180;
-const SIDEBAR_MAX = 600;
-const SIDEBAR_SNAP = 12; // 磁吸判定像素
-let sidebarWidth = loadSidebarWidth();
-function loadSidebarWidth() {
-  const v = parseInt(localStorage.getItem('bm_sidebar_width'), 10);
-  if (!isNaN(v) && v >= SIDEBAR_MIN && v <= SIDEBAR_MAX) return v;
-  return SIDEBAR_DEFAULT;
-}
-function saveSidebarWidth(w) {
-  try { localStorage.setItem('bm_sidebar_width', String(w)); } catch (e) {}
 }
 
 function newFolder(title, children = []) {
@@ -451,6 +519,7 @@ function parseBookmarks(html) {
   catch (e) { doc = parser.parseFromString('<html><body>' + cleanHtml + '</body></html>', 'text/html'); }
   const firstDl = doc.querySelector('dl');
   if (!firstDl) throw new Error('未找到 <DL> 结构，可能不是 Chrome 书签文件');
+  // 兼容：如果只有一个 H3 且没有兄弟，直接用它
   const rootFolder = newFolder('书签栏');
   rootFolder.children = parseDl(firstDl);
   return rootFolder;
@@ -606,16 +675,16 @@ function countAll(node) {
   if (node.type === 'bookmark') return 1;
   return 1 + node.children.reduce((s, c) => s + countAll(c), 0);
 }
-function folderPath(node) {
-  const path = [];
+function getAncestors(node) {
+  const arr = [];
   (function find(n, target, acc) {
-    if (n === target) { path.push(...acc, n.title); return true; }
+    if (n === target) { arr.push(...acc, n); return true; }
     if (n.type === 'folder') {
-      for (const c of n.children) if (find(c, target, [...acc, n.title])) return true;
+      for (const c of n.children) if (find(c, target, [...acc, n])) return true;
     }
     return false;
   })(root, node, []);
-  return path.join(' / ');
+  return arr;
 }
 function isDescendant(ancestor, node) {
   if (ancestor === node) return false;
@@ -669,9 +738,7 @@ function makeInlineInput(node) {
 /* ============================================================
  *  树渲染
  *  交互：单击文件夹 = 高亮 + 切右侧 + 展开（若收起）
- *        再次单击同一文件夹 = 高亮 + 切右侧（不收）
  *        单击箭头 = 只展开/收起
- *        双击文件夹 = 高亮 + 切右侧（与单击等效，不再做额外事）
  * ============================================================ */
 const collapsed = new Set();
 
@@ -683,38 +750,19 @@ function renderTree() {
     document.getElementById('totalCount').textContent = '';
     return;
   }
-  const rootRow = document.createElement('div');
-  rootRow.className = 'tree-row';
-  if (currentFolder === root) rootRow.classList.add('active');
-  rootRow.innerHTML = `<span class="arrow">▼</span><span class="icon">📁</span><span class="name">${esc(root.title)}</span><span class="count">${countBookmarks(root)}</span>`;
-  rootRow.onclick = () => {
-    currentFolder = root;
-    selectedIds.clear();
-    sortState = { key: null, dir: 1 };
-    renderTree(); renderList();
-  };
-  rootRow.ondragover = (e) => {
-    e.preventDefault(); e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    clearTreeIndicator();
-    rootRow.classList.add('drop-target');
-  };
-  rootRow.ondrop = (e) => {
-    e.preventDefault(); e.stopPropagation();
-    clearTreeIndicator();
-    dropIntoFolder(getDragIds(e), root.id);
-  };
-  treeEl.appendChild(rootRow);
 
+  // 只渲染根的子级，根节点本身不显示（去掉了多余的"书签栏"行）
   const container = document.createElement('div');
   container.className = 'tree-children';
+  container.style.marginLeft = '0';
   for (const child of root.children) {
     if (child.type === 'folder') container.appendChild(renderFolderNode(child));
   }
+  // 如果根下还有书签（极少见），也不渲染在树里
   treeEl.appendChild(container);
 
   document.getElementById('totalCount').textContent =
-    countAll(root) + ' 项 / ' + countBookmarks(root) + ' 书签';
+    countAll(root) - 1 + ' 项 / ' + countBookmarks(root) + ' 书签';
 }
 
 function renderFolderNode(node) {
@@ -755,20 +803,12 @@ function renderFolderNode(node) {
   count.textContent = countBookmarks(node);
   row.appendChild(count);
 
-  // 单击：高亮 + 切右侧 + 展开（若收起）
   row.onclick = (e) => {
     if (editingId === node.id) return;
     currentFolder = node;
     selectedIds.clear();
-    sortState = { key: null, dir: 1 };
-    // 若收起 → 展开；若已展开 → 保持不动（不收）
     if (collapsed.has(node.id)) collapsed.delete(node.id);
     renderTree(); renderList();
-  };
-
-  row.ondblclick = (e) => {
-    // 双击当作"进入"——跟单击等效，只是把右键菜单可能触发的单击也一并走一次
-    e.preventDefault();
   };
 
   row.draggable = editingId !== node.id;
@@ -823,7 +863,7 @@ function clearTreeIndicator() {
 function collapseAll(collapse) {
   if (!root) return;
   if (collapse) {
-    walkAll(root, (n) => { if (n.type === 'folder' && n !== root) collapsed.add(n.id); });
+    walkAll(root, (n) => { if (n.type === 'folder') collapsed.add(n.id); });
   } else {
     collapsed.clear();
   }
@@ -848,7 +888,6 @@ function setupSidebarSplitter() {
 
     const onMove = (ev) => {
       let w = startW + (ev.clientX - startX);
-      // 磁吸
       if (Math.abs(w - SIDEBAR_DEFAULT) <= SIDEBAR_SNAP) w = SIDEBAR_DEFAULT;
       if (w < SIDEBAR_MIN) w = SIDEBAR_MIN;
       if (w > SIDEBAR_MAX) w = SIDEBAR_MAX;
@@ -866,7 +905,6 @@ function setupSidebarSplitter() {
     document.addEventListener('mouseup', onUp);
   });
 
-  // 双击恢复默认
   sp.addEventListener('dblclick', () => {
     sb.style.width = SIDEBAR_DEFAULT + 'px';
     sidebarWidth = SIDEBAR_DEFAULT;
@@ -974,7 +1012,7 @@ function collectMovable(ids, filterSelf = null, excludeRef = null) {
 }
 
 /* ============================================================
- *  列表栏（表头）+ splitter（横向滚动 + 列宽可拖）
+ *  列表栏（表头）+ splitter
  * ============================================================ */
 const COLUMNS = [
   { key: '__fav',  label: '',     sortable: false },
@@ -1001,6 +1039,8 @@ function renderListHeader() {
   el.innerHTML = '';
   const cols = visibleColumns();
   let totalWidth = 0;
+  const curSortKey = currentSortKey();
+  const curSortDir = currentSortDir();
   cols.forEach((col) => {
     const w = colWidths[col.key] || DEFAULT_COLS[col.key] || 100;
     totalWidth += w + 5;
@@ -1012,14 +1052,17 @@ function renderListHeader() {
 
     const lbl = document.createElement('span');
     lbl.className = 'col-label';
-    if (col.sortable && sortState.key === col.key) {
-      lbl.textContent = col.label + (sortState.dir === 1 ? ' ▲' : ' ▼');
+    if (col.sortable && curSortKey === col.key) {
+      lbl.textContent = col.label + (curSortDir === 1 ? ' ▲' : ' ▼');
     } else {
       lbl.textContent = col.label;
     }
     d.appendChild(lbl);
     if (col.sortable) d.onclick = () => toggleSort(col.key);
     el.appendChild(d);
+
+    // favicon 列后面不加 splitter（固定不可拖）
+    if (col.key === '__fav') return;
 
     const sp = document.createElement('div');
     sp.className = 'splitter';
@@ -1029,7 +1072,6 @@ function renderListHeader() {
     el.appendChild(sp);
   });
 
-  // 让表头和列表内容同宽（多出来的用 padding 吸收，不额外占 splitter）
   el.style.minWidth = totalWidth + 'px';
 }
 
@@ -1048,7 +1090,6 @@ function beginColResize(e, key) {
     if (w > 1200) w = 1200;
     colWidths[key] = w;
     applyWidthToDom(key, w);
-    // 让表头 min-width 重新计算
     recalcHeaderWidth();
   };
   const onUp = () => {
@@ -1098,15 +1139,24 @@ function autoFitColumn(key) {
 }
 
 function toggleSort(key) {
-  if (sortState.key === key) sortState.dir = -sortState.dir;
-  else { sortState.key = key; sortState.dir = 1; }
+  if (globalSortEnabled) {
+    if (globalSortState.key === key) globalSortState.dir = -globalSortState.dir;
+    else { globalSortState.key = key; globalSortState.dir = 1; }
+  } else {
+    if (!currentFolder) return;
+    const s = folderSortStates[currentFolder.id] || { key: null, dir: 1 };
+    if (s.key === key) s.dir = -s.dir;
+    else { s.key = key; s.dir = 1; }
+    folderSortStates[currentFolder.id] = s;
+  }
   renderList();
 }
 function applySort(items) {
-  if (!sortState.key) return items;
-  const k = sortState.key, d = sortState.dir;
+  const key = currentSortKey();
+  if (!key) return items;
+  const d = currentSortDir();
   const getVal = (it) => {
-    switch (k) {
+    switch (key) {
       case 'title': return (it.title || '').toLowerCase();
       case 'url': return (it.url || '').toLowerCase();
       case 'status': return it.linkStatus || '';
@@ -1119,6 +1169,39 @@ function applySort(items) {
     if (va < vb) return -1 * d;
     if (va > vb) return 1 * d;
     return 0;
+  });
+}
+
+/* ============================================================
+ *  面包屑
+ * ============================================================ */
+function renderBreadcrumb() {
+  const el = document.getElementById('breadcrumb');
+  if (!el) return;
+  el.innerHTML = '';
+  if (!currentFolder || !root) return;
+
+  // 获取祖先链（包含 currentFolder 本身）
+  const chain = getAncestors(currentFolder);
+  chain.forEach((node, i) => {
+    const isLast = i === chain.length - 1;
+    const c = document.createElement('span');
+    c.className = 'crumb' + (isLast ? ' current' : '');
+    c.textContent = node.title || '(未命名)';
+    if (!isLast) {
+      c.onclick = () => {
+        currentFolder = node;
+        selectedIds.clear();
+        renderTree(); renderList();
+      };
+    }
+    el.appendChild(c);
+    if (!isLast) {
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = '›';
+      el.appendChild(sep);
+    }
   });
 }
 
@@ -1139,14 +1222,12 @@ function getVisibleItems() {
 
 function renderList() {
   const listInner = document.getElementById('listInner');
-  const titleEl = document.getElementById('folderTitle');
-  const pathEl = document.getElementById('folderPath');
   const selectAllBtn = document.getElementById('btnSelectAll');
   const isSearch = !!searchQuery;
 
+  renderBreadcrumb();
+
   if (!currentFolder && !isSearch) {
-    titleEl.textContent = '未导入';
-    pathEl.textContent = '';
     listInner.innerHTML = '<div class="empty">点击「导入书签」开始</div>';
     selectAllBtn.style.display = 'none';
     renderListHeader();
@@ -1157,12 +1238,6 @@ function renderList() {
   let items = isSearch ? currentSearchResults.slice() : getVisibleItems();
   items = applySort(items);
 
-  titleEl.textContent = isSearch
-    ? `搜索结果：${items.length} 条`
-    : (currentFolder ? (currentFolder.title || '(未命名)') : '');
-  pathEl.textContent = isSearch
-    ? `关键词 "${searchQuery}"`
-    : (root && currentFolder ? folderPath(currentFolder) : '');
   selectAllBtn.style.display = 'inline-block';
 
   const allSelected = items.length > 0 && items.every(i => selectedIds.has(i.id));
@@ -1185,7 +1260,6 @@ function renderList() {
     if (selectedIds.has(it.id)) row.classList.add('selected');
     row.dataset.id = it.id;
 
-    // 高亮只覆盖到列尾 —— 用一个 row-inner 包住所有列，高亮打在这里
     const inner = document.createElement('div');
     inner.className = 'row-inner';
 
@@ -1262,7 +1336,6 @@ function renderList() {
         currentFolder = it;
         selectedIds.clear();
         searchQuery = ''; document.getElementById('searchBox').value = '';
-        sortState = { key: null, dir: 1 };
         renderTree(); renderList();
       }
     };
@@ -1329,11 +1402,6 @@ function faviconUrl(url) {
 }
 
 function reorderMulti(ids, targetId, before) {
-  if (sortState.key && currentFolder && !searchQuery) {
-    currentFolder.children = applySort(currentFolder.children.slice());
-    sortState = { key: null, dir: 1 };
-    renderList();
-  }
   const tgt = findById(targetId);
   if (!tgt) return;
   const targetParent = tgt.parent || root;
@@ -1425,89 +1493,160 @@ function createBookmark() {
 }
 
 /* ============================================================
- *  查找重复
+ *  查找重复（升级版：左右布局 + 组内单选保留哪个）
  * ============================================================ */
-function findDuplicates(scope) {
-  const seen = new Map();
-  const removed = [];
+function findDuplicatesGrouped(scope) {
+  const groups = new Map(); // url -> [ { node, parent, path } ]
   function traverse(folder, pathArr) {
     for (const c of folder.children) {
       if (c.type === 'folder') { traverse(c, [...pathArr, c.title]); }
       else {
         const key = (c.url || '').trim().toLowerCase();
         if (!key) continue;
-        if (seen.has(key)) {
-          const first = seen.get(key);
-          removed.push({
-            node: c, parent: folder,
-            title: c.title, url: c.url,
-            path: [...pathArr, folder.title].join(' / '),
-            keptTitle: first.node.title, keptPath: first.path,
-          });
-        } else {
-          seen.set(key, { node: c, path: [...pathArr, folder.title].join(' / ') });
-        }
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({
+          node: c, parent: folder,
+          path: [...pathArr, folder.title].join(' / '),
+        });
       }
     }
   }
   traverse(scope, []);
-  return removed;
+  // 只保留 >1 的组
+  const result = [];
+  groups.forEach((arr, url) => {
+    if (arr.length > 1) result.push({ url, items: arr });
+  });
+  return result;
 }
 
 function findDupDialog() {
   if (!root) return;
   const scope = currentFolder || root;
-  const dups = findDuplicates(scope);
+  const groups = findDuplicatesGrouped(scope);
 
-  if (!dups.length) {
+  if (!groups.length) {
     setStatus('没有发现重复书签');
     showModal('查找重复结果', `<p>范围：<b>${esc(scope.title)}</b></p><p style="color:var(--muted); margin-top:8px;">没有发现重复书签。</p>`);
     return;
   }
 
-  const logLines = [
-    `# 重复书签日志`,
-    `# 生成时间: ${new Date().toLocaleString()}`,
-    `# 工具版本: v${APP_VERSION}`,
-    `# 范围: ${scope.title}`,
-    `# 重复数: ${dups.length}`,
-    '',
-  ];
-  dups.forEach((r, i) => {
-    logLines.push(`[${i + 1}] 待删除`);
-    logLines.push(`    标题: ${r.title}`);
-    logLines.push(`    URL : ${r.url}`);
-    logLines.push(`    原位置: ${r.path}`);
-    logLines.push(`    保留项: ${r.keptTitle}`);
-    logLines.push('');
-  });
-  const logText = logLines.join('\n');
-  const escLog = logText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // 每个 URL 组选中的保留项：默认第 0 个
+  const keepIndex = new Map();
+  groups.forEach((g, i) => keepIndex.set(i, 0));
 
-  setStatus(`发现 ${dups.length} 个重复书签，等待确认删除`);
-  showModal(`发现 ${dups.length} 个重复书签`, `
-    <p style="margin-bottom:10px;">范围：<b>${esc(scope.title)}</b>，将保留每个 URL 最早出现的一个。</p>
-    <div class="log-box">${escLog}</div>
-  `, [
-    { label: '下载 .log', action: () => {
-        const blob = new Blob([logText], { type: 'text/plain;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `duplicates_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.log`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }},
-    { label: '取消', action: closeModal },
-    { label: `确定删除 ${dups.length} 项重复`, primary: true, action: () => {
-        for (const r of dups) {
-          if (r.parent) r.parent.children = r.parent.children.filter(c => c.id !== r.node.id);
-        }
-        closeModal();
-        renderTree(); renderList();
-        if (searchQuery) doSearch(searchQuery);
-        setStatus(`已删除 ${dups.length} 个重复书签`);
-      }},
-  ]);
+  // 计算总"待删除"数
+  function calcTotalDelete() {
+    let total = 0;
+    groups.forEach((g, i) => {
+      total += g.items.length - 1;
+    });
+    return total;
+  }
+
+  const box = document.getElementById('modalBox');
+  document.getElementById('modalMask').classList.add('show');
+
+  function renderBody() {
+    // 左侧
+    let leftHtml = '<div class="dup-left">';
+    groups.forEach((g, gi) => {
+      leftHtml += `<div class="dup-group" data-g="${gi}">`;
+      leftHtml += `<div class="group-header" title="${escAttr(g.url)}">🔗 ${esc(g.url)}</div>`;
+      g.items.forEach((it, ii) => {
+        const keep = keepIndex.get(gi) === ii;
+        leftHtml += `
+          <label class="dup-row ${keep ? 'keep' : 'del'}" data-g="${gi}" data-i="${ii}">
+            <input type="radio" name="dup-keep-${gi}" ${keep ? 'checked' : ''}>
+            <span class="dup-title">${esc(it.node.title)}</span>
+            <span class="dup-path" title="${escAttr(it.path)}">${esc(it.path)}</span>
+          </label>
+        `;
+      });
+      leftHtml += '</div>';
+    });
+    leftHtml += '</div>';
+
+    // 右侧日志
+    const logLines = [];
+    logLines.push(`# 重复书签报告`);
+    logLines.push(`# 生成时间: ${new Date().toLocaleString()}`);
+    logLines.push(`# 工具版本: v${APP_VERSION}`);
+    logLines.push(`# 范围: ${scope.title}`);
+    logLines.push(`# 重复组数: ${groups.length}`);
+    logLines.push(`# 总待删除: ${calcTotalDelete()}`);
+    logLines.push('');
+    groups.forEach((g, gi) => {
+      logLines.push(`[组 ${gi + 1}] ${g.url}`);
+      g.items.forEach((it, ii) => {
+        const keep = keepIndex.get(gi) === ii;
+        logLines.push(`    ${keep ? '[保留]' : '[删除]'} ${it.node.title}`);
+        logLines.push(`           位置: ${it.path}`);
+      });
+      logLines.push('');
+    });
+    const logText = logLines.join('\n');
+    const escLog = logText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const rightHtml = `<div class="dup-right">${escLog}</div>`;
+
+    box.innerHTML = `
+      <h3>🔍 查找重复（共 ${groups.length} 组，待删除 ${calcTotalDelete()} 项）</h3>
+      <div class="modal-body" style="overflow:hidden;">
+        <p style="color:var(--muted); font-size:12px; margin-bottom:10px; flex-shrink:0;">
+          范围：<b>${esc(scope.title)}</b>。每组内用单选决定保留哪一个，其余会被删除。
+        </p>
+        <div class="dup-layout" style="flex:1;">${leftHtml}${rightHtml}</div>
+      </div>
+      <div class="modal-actions">
+        <button id="dupCancel">取消</button>
+        <button class="primary" id="dupConfirm">确定删除选中的</button>
+      </div>
+    `;
+
+    // 事件
+    box.querySelectorAll('.dup-row').forEach(row => {
+      row.onclick = (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        const gi = parseInt(row.dataset.g, 10);
+        const ii = parseInt(row.dataset.i, 10);
+        keepIndex.set(gi, ii);
+        renderBody();
+      };
+    });
+    box.querySelectorAll('input[type=radio]').forEach(radio => {
+      radio.onchange = (e) => {
+        const row = radio.closest('.dup-row');
+        const gi = parseInt(row.dataset.g, 10);
+        const ii = parseInt(row.dataset.i, 10);
+        keepIndex.set(gi, ii);
+        renderBody();
+      };
+    });
+
+    document.getElementById('dupCancel').onclick = () => { closeModal(); };
+    document.getElementById('dupConfirm').onclick = () => {
+      let cnt = 0;
+      groups.forEach((g, gi) => {
+        const keepIdx = keepIndex.get(gi);
+        g.items.forEach((it, ii) => {
+          if (ii === keepIdx) return;
+          if (it.parent) it.parent.children = it.parent.children.filter(c => c.id !== it.node.id);
+          cnt++;
+        });
+      });
+      closeModal();
+      renderTree(); renderList();
+      if (searchQuery) doSearch(searchQuery);
+      setStatus(`已删除 ${cnt} 个重复书签`);
+    };
+  }
+
+  renderBody();
+
+  // 让弹窗大一些
+  box.style.width = Math.min(window.innerWidth * 0.9, 1200) + 'px';
+  box.style.height = Math.min(window.innerHeight * 0.85, 800) + 'px';
 }
 
 /* ============================================================
@@ -1523,6 +1662,10 @@ const renameRule = {
 };
 const renameScope = { folders: true, bookmarks: true };
 let renameActiveTab = 'trim';
+
+// 撤销/重做栈
+let renameUndoStack = [];
+let renameRedoStack = [];
 
 function applyRuleTrim(text, r) {
   if (!text) return text;
@@ -1607,7 +1750,6 @@ function applyRuleRegex(text, r) {
   catch (e) { return text; }
   return text.replace(re, r.repl || '');
 }
-
 function applyAllRules(title, index, type) {
   let t = title;
   if (renameRule.trim.enabled) t = applyRuleTrim(t, renameRule.trim);
@@ -1643,15 +1785,14 @@ function openRenameDialog() {
     { id: 'regex',   label: '正则' },
   ];
 
-  // 预览表列宽状态（全局只初始化一次）
-  if (!window.__previewColWidths) window.__previewColWidths = { chk: 34, old: 420, arrow: 30, new: 420 };
-  // 预览勾选状态
   if (!window.__renameChecked) window.__renameChecked = new Map();
   targets.forEach(t => {
     if (!window.__renameChecked.has(t.node.id)) window.__renameChecked.set(t.node.id, true);
   });
 
-  // 打开弹窗并一次性写入所有 DOM
+  // 预览列宽（chk 固定，old/new 可拖）
+  if (!window.__previewColWidths) window.__previewColWidths = { old: 380, new: 380 };
+
   const box = document.getElementById('modalBox');
   document.getElementById('modalMask').classList.add('show');
   box.innerHTML = `
@@ -1667,6 +1808,8 @@ function openRenameDialog() {
         <span style="color:var(--muted); font-size:12px; margin-left:auto;">
           共 ${targets.length} 项
         </span>
+        <button id="renameUndo" title="撤销上一次应用">↶ 撤销</button>
+        <button id="renameRedo" title="重做">↷ 重做</button>
       </div>
       <div class="tabs" id="renameTabs"></div>
       <div class="tab-panel" id="tabPanel"></div>
@@ -1681,7 +1824,6 @@ function openRenameDialog() {
     <div class="modal-resize-hint"></div>
   `;
 
-  // 尺寸：16:9、可拉伸
   const w = Math.min(window.innerWidth * 0.9, 1400);
   const h = Math.min(window.innerHeight * 0.9, w * 9 / 16);
   box.style.width = w + 'px';
@@ -1690,12 +1832,17 @@ function openRenameDialog() {
   box.style.maxHeight = '92vh';
   box.style.overflow = 'hidden';
 
-  // 获取所有关键 DOM 引用
   const tabBarEl = document.getElementById('renameTabs');
   const panelEl = document.getElementById('tabPanel');
   const previewInnerEl = document.getElementById('previewInner');
+  const undoBtn = document.getElementById('renameUndo');
+  const redoBtn = document.getElementById('renameRedo');
 
-  // 顶部开关
+  function updateUndoRedoButtons() {
+    undoBtn.disabled = renameUndoStack.length === 0;
+    redoBtn.disabled = renameRedoStack.length === 0;
+  }
+
   document.getElementById('scope-folder').onchange = (e) => {
     renameScope.folders = e.target.checked;
     refreshPreview();
@@ -1708,6 +1855,8 @@ function openRenameDialog() {
   document.getElementById('renameApply').onclick = () => {
     const checked = getCheckedPreviewIds();
     if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
+    // 记录历史：每个被改名项的 id 及原名
+    const history = [];
     let folderIdx = 0, bmIdx = 0, cnt = 0;
     for (const t of targets) {
       const type = t.node.type;
@@ -1715,16 +1864,51 @@ function openRenameDialog() {
       if (type === 'bookmark' && !renameScope.bookmarks) continue;
       if (!checked.has(t.node.id)) continue;
       const idx = type === 'folder' ? folderIdx++ : bmIdx++;
+      const oldTitle = t.node.title;
       t.node.title = applyAllRules(t.node.title, idx, type);
+      if (t.node.title !== oldTitle) {
+        history.push({ id: t.node.id, oldTitle, newTitle: t.node.title });
+      }
       cnt++;
+    }
+    if (history.length) {
+      renameUndoStack.push(history);
+      renameRedoStack = [];
     }
     closeModal();
     renderTree(); renderList();
     if (searchQuery) doSearch(searchQuery);
-    setStatus(`已批量改名 ${cnt} 个项`);
+    setStatus(`已批量改名 ${cnt} 个项，可点「↶ 撤销」撤回`);
   };
+  undoBtn.onclick = () => {
+    if (!renameUndoStack.length) return;
+    const history = renameUndoStack.pop();
+    // 反转应用
+    for (const h of history) {
+      const r = findById(h.id);
+      if (r) r.node.title = h.oldTitle;
+    }
+    renameRedoStack.push(history);
+    renderTree(); renderList();
+    if (searchQuery) doSearch(searchQuery);
+    setStatus(`已撤销 ${history.length} 项改动`);
+    updateUndoRedoButtons();
+  };
+  redoBtn.onclick = () => {
+    if (!renameRedoStack.length) return;
+    const history = renameRedoStack.pop();
+    for (const h of history) {
+      const r = findById(h.id);
+      if (r) r.node.title = h.newTitle;
+    }
+    renameUndoStack.push(history);
+    renderTree(); renderList();
+    if (searchQuery) doSearch(searchQuery);
+    setStatus(`已重做 ${history.length} 项改动`);
+    updateUndoRedoButtons();
+  };
+  updateUndoRedoButtons();
 
-  /* ---------- tab 栏 ---------- */
   function renderTabs() {
     tabBarEl.innerHTML = tabs.map(t => {
       const enabled = renameRule[t.id].enabled;
@@ -1742,12 +1926,11 @@ function openRenameDialog() {
     });
   }
 
-  /* ---------- 保存当前 tab 输入 ---------- */
   function saveTabPanel() {
     const t = renameActiveTab;
     const r = renameRule[t];
     const q = (id) => document.getElementById(id);
-    if (!q('r-enabled')) return; // 面板还没渲染，跳过
+    if (!q('r-enabled')) return;
     if (t === 'trim') {
       r.head = q('r-head').value;
       r.headN = parseInt(q('r-headN').value, 10) || 1;
@@ -1780,7 +1963,6 @@ function openRenameDialog() {
     }
   }
 
-  /* ---------- 渲染当前 tab 参数面板 ---------- */
   function renderTabPanel() {
     const r = renameRule[renameActiveTab];
     const enabled = r.enabled;
@@ -1889,37 +2071,27 @@ function openRenameDialog() {
         <input type="text" id="r-regexPattern" value="${escAttr(r.pattern)}" placeholder="例如 ^(.+?) \\|.*$">
         <label>替换为（$1 $2 捕获组，留空 = 删除）</label>
         <input type="text" id="r-regexRepl" value="${escAttr(r.repl)}" placeholder="$1">
-        <p class="hint">高级用法，熟悉正则再用。示例：模式 <code>^(.+?) \\|.*$</code> 替换 <code>$1</code> → 保留第一个竖线之前的内容。</p>
+        <p class="hint">高级用法。示例：模式 <code>^(.+?) \\|.*$</code> 替换 <code>$1</code> → 保留第一个竖线之前的内容。</p>
       `;
     }
 
     panelEl.innerHTML = html;
 
-    // 启用开关
     document.getElementById('r-enabled').onchange = (e) => {
       renameRule[renameActiveTab].enabled = e.target.checked;
       renderTabs();
       refreshPreview();
     };
-    // 输入实时刷新
     panelEl.querySelectorAll('input, select').forEach(el => {
       el.addEventListener('input', () => { saveTabPanel(); refreshPreview(); });
       el.addEventListener('change', () => { saveTabPanel(); refreshPreview(); });
     });
   }
 
-  /* ---------- 预览表渲染 ---------- */
-  const PREVIEW_COLS = [
-    { key: 'chk',   label: '',       def: 34,  fixed: true },
-    { key: 'old',   label: '原始',   def: 420, fixed: true },
-    { key: 'arrow', label: '',       def: 30,  fixed: true },
-    { key: 'new',   label: '改后',   def: 420, fixed: true },
-  ];
-
+  /* ---------- 预览表：3 列固定结构（chk / old / new） ---------- */
   function refreshPreview() {
     if (!previewInnerEl) return;
 
-    // 过滤掉不参与的类型
     const visible = targets.filter(t => {
       const type = t.node.type;
       if (type === 'folder' && !renameScope.folders) return false;
@@ -1927,25 +2099,15 @@ function openRenameDialog() {
       return true;
     });
 
-    // 计算每列宽度
-    const colW = {};
-    let totalW = 0;
-    PREVIEW_COLS.forEach(c => {
-      const w = window.__previewColWidths[c.key] || c.def;
-      colW[c.key] = w;
-      totalW += w + 5;
-    });
+    const wOld = window.__previewColWidths.old;
+    const wNew = window.__previewColWidths.new;
 
-    // 表头
-    let html = '<div class="preview-header">';
-    PREVIEW_COLS.forEach(c => {
-      const w = colW[c.key];
-      html += `<div class="pcol ${c.key === 'chk' ? 'chk-col' : ''}" data-pkey="${c.key}" style="width:${w}px">${c.label}</div>`;
-      if (c.fixed) html += `<div class="splitter" data-pkey="${c.key}"></div>`;
-    });
-    html += '</div>';
+    let html = '<table class="preview-table"><thead><tr>';
+    html += `<th class="chk-col"><input type="checkbox" id="previewCheckAll" checked></th>`;
+    html += `<th class="old-col" style="width:${wOld}px" data-pkey="old">原始标题<span class="splitter" data-pkey="old" style="display:inline-block;width:5px;height:12px;cursor:col-resize;position:relative;margin-left:4px;vertical-align:middle;"></span></th>`;
+    html += `<th class="new-col" style="width:${wNew}px" data-pkey="new">改后标题<span class="splitter" data-pkey="new" style="display:inline-block;width:5px;height:12px;cursor:col-resize;position:relative;margin-left:4px;vertical-align:middle;"></span></th>`;
+    html += '</tr></thead><tbody>';
 
-    // 行
     let folderIdx = 0, bmIdx = 0;
     visible.forEach(t => {
       const type = t.node.type;
@@ -1955,52 +2117,55 @@ function openRenameDialog() {
       const checked = window.__renameChecked.get(t.node.id) !== false;
       const folderMark = type === 'folder' ? '📁 ' : '';
 
-      html += `<div class="preview-row ${checked ? '' : 'disabled'}" data-id="${t.node.id}"><div class="row-inner">`;
-      PREVIEW_COLS.forEach(c => {
-        const w = colW[c.key];
-        if (c.key === 'chk') {
-          html += `<div class="pcol chk-col" data-pkey="chk" style="width:${w}px"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></div>`;
-        } else if (c.key === 'old') {
-          html += `<div class="pcol old" data-pkey="old" style="width:${w}px" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</div>`;
-        } else if (c.key === 'arrow') {
-          html += `<div class="pcol arrow" data-pkey="arrow" style="width:${w}px">→</div>`;
-        } else if (c.key === 'new') {
-          html += `<div class="pcol new" data-pkey="new" style="width:${w}px" title="${escAttr(newT)}">${esc(folderMark + newT)}</div>`;
-        }
-        if (c.fixed) html += `<div class="splitter" data-pkey="${c.key}"></div>`;
-      });
-      html += '</div></div>';
+      html += `<tr class="${checked ? '' : 'disabled'}" data-id="${t.node.id}">`;
+      html += `<td class="chk-col"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></td>`;
+      html += `<td class="old-col" style="width:${wOld}px" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</td>`;
+      html += `<td class="new-col" style="width:${wNew}px" title="${escAttr(newT)}">${esc(folderMark + newT)}</td>`;
+      html += '</tr>';
     });
 
+    html += '</tbody></table>';
     previewInnerEl.innerHTML = html;
-    previewInnerEl.style.minWidth = totalW + 'px';
 
-    // 勾选
+    // 表头全选
+    const chkAll = document.getElementById('previewCheckAll');
+    if (chkAll) {
+      chkAll.onchange = (e) => {
+        const on = e.target.checked;
+        previewInnerEl.querySelectorAll('.preview-chk').forEach(cb => {
+          cb.checked = on;
+          window.__renameChecked.set(cb.dataset.id, on);
+          const tr = cb.closest('tr');
+          if (on) tr.classList.remove('disabled');
+          else tr.classList.add('disabled');
+        });
+      };
+    }
+
+    // 行勾选
     previewInnerEl.querySelectorAll('.preview-chk').forEach(cb => {
       cb.onchange = (e) => {
         window.__renameChecked.set(cb.dataset.id, e.target.checked);
-        const row = cb.closest('.preview-row');
-        if (e.target.checked) row.classList.remove('disabled');
-        else row.classList.add('disabled');
+        const tr = cb.closest('tr');
+        if (e.target.checked) tr.classList.remove('disabled');
+        else tr.classList.add('disabled');
       };
     });
 
     // 列宽拖拽
-    previewInnerEl.querySelectorAll('.preview-header .splitter').forEach(sp => {
+    previewInnerEl.querySelectorAll('th .splitter').forEach(sp => {
       sp.onmousedown = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const key = sp.dataset.pkey;
         const startX = e.clientX;
-        const startW = window.__previewColWidths[key] || PREVIEW_COLS.find(c => c.key === key).def;
+        const startW = window.__previewColWidths[key];
         const onMove = (ev) => {
           let w = startW + (ev.clientX - startX);
-          if (w < 30) w = 30;
+          if (w < 60) w = 60;
           if (w > 1200) w = 1200;
           window.__previewColWidths[key] = w;
           previewInnerEl.querySelectorAll(`[data-pkey="${key}"]`).forEach(el => el.style.width = w + 'px');
-          let total = 0;
-          PREVIEW_COLS.forEach(c => { total += (window.__previewColWidths[c.key] || c.def) + 5; });
-          previewInnerEl.style.minWidth = total + 'px';
         };
         const onUp = () => {
           document.removeEventListener('mousemove', onMove);
@@ -2020,7 +2185,6 @@ function openRenameDialog() {
     return out;
   }
 
-  /* ---------- 初始化：先 tab 栏、再面板、最后预览 ---------- */
   renderTabs();
   renderTabPanel();
   refreshPreview();
@@ -2220,11 +2384,8 @@ function showModal(title, bodyHtml, buttons = [{ label: '关闭', action: closeM
 function closeModal() {
   document.getElementById('modalMask').classList.remove('show');
 }
-// 点遮罩不关（按 6d）
 document.getElementById('modalMask').onclick = (e) => {
-  if (e.target.id === 'modalMask') {
-    // 不关
-  }
+  if (e.target.id === 'modalMask') { /* 不关 */ }
 };
 
 function showAbout() {
@@ -2234,17 +2395,14 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
-      <b>v1.7.1</b> · 修复批量改名弹窗 tab 无法点击、预览区空白（重排初始化顺序、DOM 引用提前获取）<br>
-      <b>v1.7.0</b> · 侧边栏可拖（磁吸 280px）、树状栏单击展开+切换、主列表横向滚动、批量改名弹窗 16:9 可拉伸 + 应用到文件夹/书签、示例文字抽象化、预览表列宽可拖<br>
-      <b>v1.6.0</b> · 批量改名（Tab 式 6 种规则：裁剪/替换/删除/序号/前后缀/正则，规则可叠加、逐条勾选、实时预览）；行高亮只到列尾、右侧空白可框选<br>
-      <b>v1.5.0</b> · 预设清理标题（11 条规则可勾选 + 实时预览）<br>
-      <b>v1.4.0</b> · 重写列宽逻辑（固定列 + 末列 flex 填满、splitter 钳制防崩坏）、缩短行 padding、批量编辑简化为纯正则<br>
-      <b>v1.3.1</b> · splitter 拖拽钳制防崩坏、Delete 可删树文件夹、F2 内联重命名、批量编辑加正则、去掉时间列<br>
-      <b>v1.3.0</b> · 全部折叠/展开、列表拖入文件夹、drop 标记防弹回、导出选中、查找重复（先报告后确认删除）、列表栏排序、框选选择、去重日志<br>
-      <b>v1.2.1</b> · 修复拖拽失效（dragstart 不再重渲 DOM）、树同级改为行内三分区<br>
-      <b>v1.2.0</b> · 列宽 splitter、多选拖拽、树同级插入、drop 阈值优化<br>
-      <b>v1.1.0</b> · 列表栏排序、框选选择、去重日志；修复搜索全选<br>
-      <b>v1.0.0</b> · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
+      <b>v1.8.0</b> · 树状栏去掉多余根行、默认全部折叠；面包屑导航（祖先灰/当前亮、可点击跳转）；全局排序开关；批量改名预览表改为 3 列网格 + 支持撤销/重做；查找重复改为左右布局 + 组内单选保留；图标列固定不可拖<br>
+      <b>v1.7.1</b> · 修复批量改名弹窗 tab 无法点击、预览区空白<br>
+      <b>v1.7.0</b> · 侧边栏可拖（磁吸 280px）、树状栏单击展开+切换、主列表横向滚动、批量改名弹窗 16:9 可拉伸 + 应用到文件夹/书签<br>
+      <b>v1.6.0</b> · 批量改名（Tab 式 6 种规则可叠加、逐条勾选、实时预览）<br>
+      <b>v1.5.0</b> · 预设清理标题（11 条规则）<br>
+      <b>v1.4.0</b> · 重写列宽逻辑、缩短 padding<br>
+      <b>v1.3.1</b> · splitter 钳制、Delete 删树文件夹、F2 内联重命名<br>
+      v1.0.0 · 导入/导出、搜索、拖拽整理、批量编辑、去重、排序、失效检测
     </p>
   `);
 }
@@ -2264,6 +2422,9 @@ function importFile(file) {
       const newRoot = parseBookmarks(e.target.result);
       if (!root) {
         root = newRoot; currentFolder = root;
+        // 默认全部折叠
+        collapsed.clear();
+        walkAll(root, (n) => { if (n.type === 'folder') collapsed.add(n.id); });
         renderTree(); renderList();
         setStatus('已导入 ' + countBookmarks(root) + ' 个书签');
       } else {
@@ -2272,8 +2433,9 @@ function importFile(file) {
           { label: '替换现有', action: () => {
               root = newRoot; currentFolder = root;
               selectedIds.clear(); collapsed.clear();
+              walkAll(root, (n) => { if (n.type === 'folder') collapsed.add(n.id); });
               searchQuery = ''; document.getElementById('searchBox').value = '';
-              sortState = { key: null, dir: 1 };
+              folderSortStates = {}; globalSortState = { key: null, dir: 1 };
               closeModal(); renderTree(); renderList();
               setStatus('已替换，共 ' + countBookmarks(root) + ' 个书签');
             }},
@@ -2308,6 +2470,11 @@ document.getElementById('btnRename').onclick = openRenameDialog;
 document.getElementById('btnAbout').onclick = showAbout;
 document.getElementById('btnFoldAll').onclick = () => collapseAll(true);
 document.getElementById('btnUnfoldAll').onclick = () => collapseAll(false);
+
+document.getElementById('globalSort').onchange = (e) => {
+  globalSortEnabled = e.target.checked;
+  renderList();
+};
 
 document.getElementById('btnSelectAll').onclick = () => {
   const items = searchQuery ? currentSearchResults : getVisibleItems();
