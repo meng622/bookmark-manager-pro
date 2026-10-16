@@ -4,7 +4,7 @@
 
 > 导入 → 可视化整理 → 导出，再导回 Chrome。
 
-![version](https://img.shields.io/badge/version-1.7.1-blue)
+![version](https://img.shields.io/badge/version-1.9.1-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![single file](https://img.shields.io/badge/single--file-HTML-orange)
