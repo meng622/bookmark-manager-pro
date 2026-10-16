@@ -241,6 +241,7 @@ A：理论可以（Chrome 移动版能打开 HTML），但界面是为桌面设�
 从最初的构想到一路打磨到 v1.7.1，界面设计、交互逻辑、功能取舍、bug 修复、重构建议，几乎每一次迭代都是与 DeepSeek 共同讨论的结果。作为一个不会写代码的使用者，我提出需求、反馈问题、指出不顺手的细节；DeepSeek 负责理解、拆解、给出方案并落地成可运行的代码。
 
 如果没有 DeepSeek，这个工具不会存在。感谢。
+<img width="555" height="552" alt="1000197380" src="https://github.com/user-attachments/assets/de3a8dbd-4206-4a7f-b636-43e2d8047fcf" />
 
 ---
 
@@ -496,6 +497,7 @@ The entire codebase of this project was built with the assistance of **DeepSeek*
 From the initial idea all the way to v1.7.1 — UI design, interaction logic, feature decisions, bug fixes, and refactoring suggestions — nearly every iteration was shaped through conversations with DeepSeek. As a user who doesn't write code, I described what I wanted, reported what broke, and pointed out what felt awkward. DeepSeek interpreted, broke things down, proposed solutions, and turned them into working code.
 
 Without DeepSeek, this tool would not exist. Thank you.
+<img width="555" height="552" alt="1000197380" src="https://github.com/user-attachments/assets/a72601af-4692-4aa7-946f-db7e750bd646" />
 
 ---
 
