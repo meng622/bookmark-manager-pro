@@ -2329,10 +2329,13 @@ function setupMarquee() {
 
   listEl.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    // 若正在内联编辑，先提交编辑，不进入框选
+    // 若正在内联编辑：
+    //   - 点在输入框内 → 放过（让用户定位光标）
+    //   - 点在输入框外 → 先提交再继续
     if (editingId) {
+      if (e.target.closest('.inline-edit')) return;
       const input = document.querySelector('.inline-edit');
-      if (input) input.blur();   // 触发 commitInlineEdit
+      if (input) input.blur();
       return;
     }
     if (e.target.closest('.list-item')) return;
