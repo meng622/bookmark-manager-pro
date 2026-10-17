@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>书签管理器 Pro v1.9.1</title>
-<!-- 书签管理器 Pro v1.9.1 | 2026-10-16 -->
+<title>书签管理器 Pro v1.9.3</title>
+<!-- 书签管理器 Pro v1.9.3 | 2026-10-17 -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -178,12 +178,7 @@
   .list-item.drop-before > .row-inner { box-shadow: inset 0 2px 0 0 var(--accent); }
   .list-item.drop-after  > .row-inner { box-shadow: inset 0 -2px 0 0 var(--accent); }
   .list-item.drop-into   > .row-inner { background: var(--accent2); color: #fff; }
-  /* 行末尾的"空气区"——固定 60px，用于框选 */
-  .list-item .air {
-    flex: 0 0 60px;
-    min-width: 60px;
-    height: 100%;
-  }
+  .list-item .air { flex: 0 0 60px; min-width: 60px; height: 100%; }
   .dragging { opacity: .4; }
 
   .inline-edit {
@@ -270,69 +265,92 @@
   .hint { color: var(--muted); font-size: 11px; line-height: 1.7; margin-top: 10px; }
   .hint code { background: #11111b; }
 
-  .preview-wrap {
-    border: 1px solid var(--border); border-radius: 6px;
-    overflow: auto; margin-top: 12px;
-    flex: 1 1 auto; min-height: 120px;
-    background: var(--bg);
-  }
-  .preview-inner { width: 100%; }
-  .preview-table {
-    border-collapse: collapse; font-size: 12px;
-    table-layout: fixed;
-    width: 100%;
-  }
-  .preview-table col.chk-col { width: 34px; }
-  .preview-table td {
-    border: none;
-    border-bottom: 1px solid var(--border);
-    padding: 4px 8px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    text-align: left; vertical-align: middle;
-  }
-  .preview-table th {
-    position: sticky; top: 0;
-    background: var(--panel2);
-    color: var(--muted);
-    font-weight: normal;
-    font-size: 11px;
-    height: 28px;
-    padding: 0 8px;
-    text-align: left;
-    vertical-align: middle;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-top: 1px solid var(--border);
-    z-index: 1;
-    user-select: none;
-  }
-  .preview-table th .th-inner {
-    display: flex; align-items: center; gap: 4px;
-    width: 100%; height: 100%;
-  }
-  .preview-table th .th-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .preview-table th .th-splitter {
-    flex-shrink: 0;
-    width: 8px; height: 100%;
-    cursor: col-resize;
-    position: relative;
-    margin-right: -8px;
-  }
-  .preview-table th .th-splitter::before {
-    content: ''; position: absolute;
-    left: 3px; top: 6px; bottom: 6px;
-    width: 1px; background: var(--border);
-  }
-  .preview-table th .th-splitter:hover::before,
-  .preview-table th .th-splitter.dragging::before {
-    background: var(--accent); width: 2px; left: 2.5px;
-  }
-  .preview-table th.chk-col, .preview-table td.chk-col {
-    text-align: center; padding: 4px 0;
-  }
-  .preview-table td.old-col { color: var(--muted); }
-  .preview-table td.new-col { color: var(--ok); font-weight: 500; }
-  .preview-table tr.disabled td.new-col { color: var(--muted); text-decoration: line-through; }
+/* ========== 预览表（table-layout: fixed 版）========== */
+.preview-wrap {
+  border: 1px solid var(--border); border-radius: 6px;
+  overflow: auto; margin-top: 12px;
+  flex: 1 1 auto; min-height: 120px;
+  background: var(--bg);
+  position: relative;
+}
+
+.preview-table {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;  /* 关键：让表格真实宽度撑开，不被截断 */
+  min-width: 100%;
+}
+
+.preview-table thead th {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  height: 28px; padding: 0;
+  font-size: 11px; color: var(--muted); font-weight: 400;
+  text-align: left; vertical-align: middle;
+  overflow: hidden; white-space: nowrap;
+}
+.preview-table thead th:last-child { border-right: none; }
+
+/* 表头文字：自己管自己的省略号 */
+.preview-th-label {
+  display: block;
+  padding: 0 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+.preview-table thead th:hover .preview-th-label { color: var(--text); }
+
+/* 勾选列固定居中，不可拖 */
+.preview-th-chk { text-align: center; cursor: default; }
+.preview-th-chk:hover .preview-th-label { color: var(--muted); }
+
+/* Splitter：绝对定位贴在表头单元格右边缘，不参与任何布局 */
+.preview-table thead th { position: sticky; } /* 已在上面，这里确保定位上下文 */
+.preview-th-resizer {
+  position: absolute; top: 0; right: -5px; bottom: 0;
+  width: 10px; cursor: col-resize; z-index: 6;
+  background: transparent;
+}
+.preview-th-resizer::after {
+  content: ''; position: absolute; left: 4px; top: 4px; bottom: 4px;
+  width: 1px; background: transparent;
+}
+.preview-th-resizer:hover::after,
+.preview-th-resizer.dragging::after {
+  background: var(--accent); width: 2px; left: 3.5px;
+}
+
+/* 数据行 */
+.preview-table tbody td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px;
+}
+.preview-table tbody td:last-child { border-right: none; }
+.preview-table tbody tr:hover { background: var(--panel2); }
+.preview-table tbody tr.disabled { opacity: .5; }
+.preview-table tbody tr.disabled .td-new { text-decoration: line-through; }
+
+.preview-td-chk { text-align: center; padding: 0 !important; }
+.preview-td-old { color: var(--muted); }
+.preview-td-new { color: var(--ok); font-weight: 500; }
+
+/* 空气列：吃掉剩余宽度，保证右侧能点空白框选 */
+.preview-td-air, .preview-th-air { border-right: none !important; }
+
+/* 增加一个表尾空气区，方便框选 */
+.preview-air-footer {
+  height: 150px; /* 留出足够的高度给鼠标拖拽 */
+  min-width: 100%;
+  background: transparent;
+}
+
+/* 框选用的 marquee 复用全局 .marquee */
 
   .dup-layout { display: flex; gap: 12px; flex: 1; min-height: 320px; overflow: hidden; }
   .dup-left {
@@ -408,7 +426,7 @@
   </div>
   <div class="group" style="border:none; padding-right:0;">
     <button id="btnAbout">ℹ️ 关于</button>
-    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.9.1</span>
+    <span id="version" style="color:var(--muted); font-size:11px; padding-right:4px;">v1.9.3</span>
   </div>
 </div>
 
@@ -455,7 +473,7 @@
 /* ============================================================
  *  版本
  * ============================================================ */
-const APP_VERSION = '1.9.1';
+const APP_VERSION = '1.9.3';
 
 /* ============================================================
  *  数据模型
@@ -468,10 +486,8 @@ let uidCounter = 0;
 let editingId = null;
 const uid = () => 'n' + (++uidCounter) + '_' + Date.now().toString(36);
 
-// 每个文件夹独立记自己的排序
 let folderSortStates = {};
 
-// 侧边栏宽度
 const SIDEBAR_DEFAULT = 280;
 const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 600;
@@ -486,13 +502,7 @@ function saveSidebarWidth(w) {
   try { localStorage.setItem('bm_sidebar_width', String(w)); } catch (e) {}
 }
 
-// 列宽
-const DEFAULT_COLS = {
-  '__fav': 22,
-  'title': 260,
-  'url': 360,
-  'status': 64,
-};
+const DEFAULT_COLS = { '__fav': 22, 'title': 260, 'url': 360, 'status': 64 };
 let colWidths = loadColWidths();
 function loadColWidths() {
   try {
@@ -954,7 +964,6 @@ function clearDragStyles() {
 
 /* ============================================================
  *  放置逻辑
- *  拖动 → 取消当前文件夹排序 + 先把显示顺序固化为真实顺序
  * ============================================================ */
 function cancelSortOfCurrent() {
   if (searchQuery) return;
@@ -1161,7 +1170,6 @@ function toggleSort(key) {
   renderList();
 }
 
-// 排序：文件夹永远在前，书签在后；类型内部按列值排
 function applySort(items) {
   const s = getCurrentSort();
   if (!s.key) return items;
@@ -1176,41 +1184,32 @@ function applySort(items) {
     }
   };
   return items.slice().sort((a, b) => {
-    // 文件夹永远在前
     const aIsFolder = a.type === 'folder' ? 0 : 1;
     const bIsFolder = b.type === 'folder' ? 0 : 1;
     if (aIsFolder !== bIsFolder) return aIsFolder - bIsFolder;
-    // 类型内部按列值，用自定义顺序：符号 > 数字 > 英文 > 中文
     const va = getVal(a), vb = getVal(b);
-    const c = smartCompare(va, vb);
-    return c * d;
+    return smartCompare(va, vb) * d;
   });
 }
 
-/* 自定义排序：符号 > 数字 > 英文 > 中文 */
 function smartCompare(a, b) {
   a = String(a || ''); b = String(b || '');
   const ca = charClass(a), cb = charClass(b);
-  if (ca !== cb) return ca - cb;  // 大类不同 → 按大类排
-  // 同类内部用 Intl.Collator 自然排（数字识别、大小写不敏感、中文拼音）
-  const collator = new Intl.Collator('zh-Hans-CN', {
-    numeric: true,
-    sensitivity: 'base',
-  });
+  if (ca !== cb) return ca - cb;
+  const collator = new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' });
   return collator.compare(a, b);
 }
 function charClass(s) {
   if (!s) return 4;
   const c = s.codePointAt(0);
-  // 符号：ASCII 可见非字母数字，以及常见符号区
-  if (c >= 0x20 && c < 0x30) return 0;                 // 空格 ~ /
-  if (c >= 0x3A && c < 0x41) return 0;                 // : ~ @
-  if (c >= 0x5B && c < 0x61) return 0;                 // [ ~ `
-  if (c >= 0x7B && c < 0x7F) return 0;                 // { ~ ~
-  if (c < 0x20) return 0;                              // 控制字符
-  if (c >= 0x30 && c <= 0x39) return 1;                // 数字 0-9
-  if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) return 2; // 英文
-  if (c >= 0x80) return 3;                             // 中文 / 其它非 ASCII
+  if (c >= 0x20 && c < 0x30) return 0;
+  if (c >= 0x3A && c < 0x41) return 0;
+  if (c >= 0x5B && c < 0x61) return 0;
+  if (c >= 0x7B && c < 0x7F) return 0;
+  if (c < 0x20) return 0;
+  if (c >= 0x30 && c <= 0x39) return 1;
+  if ((c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)) return 2;
+  if (c >= 0x80) return 3;
   return 4;
 }
 
@@ -1222,7 +1221,6 @@ function renderBreadcrumb() {
   if (!el) return;
   el.innerHTML = '';
   if (!currentFolder || !root) return;
-
   const chain = getAncestors(currentFolder);
   chain.forEach((node, i) => {
     const isLast = i === chain.length - 1;
@@ -1239,8 +1237,7 @@ function renderBreadcrumb() {
     el.appendChild(c);
     if (!isLast) {
       const sep = document.createElement('span');
-      sep.className = 'sep';
-      sep.textContent = '›';
+      sep.className = 'sep'; sep.textContent = '›';
       el.appendChild(sep);
     }
   });
@@ -1280,7 +1277,6 @@ function renderList() {
   items = applySort(items);
 
   selectAllBtn.style.display = 'inline-block';
-
   const allSelected = items.length > 0 && items.every(i => selectedIds.has(i.id));
   selectAllBtn.textContent = allSelected ? '全不选' : '全选';
 
@@ -1323,8 +1319,7 @@ function renderList() {
         cell.classList.add('title');
         if (it.type === 'folder') {
           const icon = document.createElement('span');
-          icon.className = 'title-icon';
-          icon.textContent = '📁 ';
+          icon.className = 'title-icon'; icon.textContent = '📁 ';
           cell.appendChild(icon);
         }
         if (editingId === it.id) {
@@ -1353,7 +1348,6 @@ function renderList() {
       inner.appendChild(cell);
     });
 
-    // 行尾空气区（固定 60px，用于框选）
     const air = document.createElement('span');
     air.className = 'air';
     inner.appendChild(air);
@@ -1447,10 +1441,8 @@ function faviconUrl(url) {
   catch { return ''; }
 }
 
-// 拖动排序：先固化显示顺序 → 清排序 → 插入
 function reorderMulti(ids, targetId, before) {
   cancelSortOfCurrent();
-
   const tgt = findById(targetId);
   if (!tgt) return;
   const targetParent = tgt.parent || root;
@@ -1701,6 +1693,7 @@ const renameRule = {
 };
 const renameScope = { folders: true, bookmarks: true };
 let renameActiveTab = 'trim';
+let isPreviewMarquee = false;
 
 let renameUndoStack = [];
 let renameRedoStack = [];
@@ -1800,7 +1793,6 @@ function applyAllRules(title, index, type) {
 }
 
 function openRenameDialog() {
-  // 每次打开弹窗都清空撤销/重做历史，避免残留
   renameUndoStack = [];
   renameRedoStack = [];
   const ids = [...selectedIds];
@@ -1831,7 +1823,8 @@ function openRenameDialog() {
     if (!window.__renameChecked.has(t.node.id)) window.__renameChecked.set(t.node.id, true);
   });
 
-  if (!window.__previewColWidths) window.__previewColWidths = { old: 50, new: 50 };
+  if (!window.__previewColWidths) window.__previewColWidths = { old: 400, new: 400 };
+  if (!window.__previewSort) window.__previewSort = { key: null, dir: 1 };
 
   const box = document.getElementById('modalBox');
   document.getElementById('modalMask').classList.add('show');
@@ -1895,7 +1888,6 @@ function openRenameDialog() {
   document.getElementById('renameApply').onclick = () => {
     const checked = getCheckedPreviewIds();
     if (!checked.size) { alert('请至少勾选一条要改名的项'); return; }
-    // 快照当前状态
     renameUndoStack.push(JSON.stringify(root));
     renameRedoStack = [];
 
@@ -1917,11 +1909,8 @@ function openRenameDialog() {
   };
   undoBtn.onclick = () => {
     if (!renameUndoStack.length) return;
-    // 当前状态推入重做栈
     renameRedoStack.push(JSON.stringify(root));
-    // 从撤销栈恢复
     root = JSON.parse(renameUndoStack.pop());
-    // 刷新界面 + 重新绑定 targets（因为 root 是新对象了）
     if (currentFolder) {
       const found = findById(currentFolder.id);
       currentFolder = found ? found.node : root;
@@ -2142,111 +2131,260 @@ function openRenameDialog() {
       return true;
     });
 
-    const wOld = window.__previewColWidths.old;
-    const wNew = window.__previewColWidths.new;
+    // 排序
+    let sortedVisible = visible.slice();
+    if (window.__previewSort && window.__previewSort.key) {
+      const k = window.__previewSort.key;
+      const d = window.__previewSort.dir;
+      sortedVisible.sort((a, b) => {
+        const idxA = targets.indexOf(a);
+        const idxB = targets.indexOf(b);
+        let va = '', vb = '';
+        if (k === 'old') { va = a.node.title || ''; vb = b.node.title || ''; }
+        if (k === 'new') {
+          va = applyAllRules(a.node.title || '', idxA, a.node.type);
+          vb = applyAllRules(b.node.title || '', idxB, b.node.type);
+        }
+        if (va < vb) return -1 * d;
+        if (va > vb) return 1 * d;
+        return 0;
+      });
+    }
 
+    const wOld = Math.max(50, window.__previewColWidths.old || 400);
+    const wNew = Math.max(50, window.__previewColWidths.new || 400);
+    const curSort = window.__previewSort || { key: null, dir: 1 };
+
+    const arrowOld = curSort.key === 'old' ? (curSort.dir === 1 ? ' ▲' : ' ▼') : '';
+    const arrowNew = curSort.key === 'new' ? (curSort.dir === 1 ? ' ▲' : ' ▼') : '';
+    const allChecked = sortedVisible.every(t => window.__renameChecked.get(t.node.id) !== false);
+
+    // ---------- 构建 table ----------
     let html = '<table class="preview-table">';
-    html += `<colgroup>`;
-    html += `<col class="chk-col">`;
-    html += `<col data-pkey="old" style="width:${wOld}%">`;
-    html += `<col data-pkey="new" style="width:${wNew}%">`;
-    html += `</colgroup>`;
+    // colgroup：列宽的唯一真相来源
+    html += '<colgroup>';
+    html += '<col style="width:34px">';               // 勾选列
+    html += `<col style="width:${wOld}px">`;           // 原始标题
+    html += `<col style="width:${wNew}px">`;           // 改后标题
+    html += '<col>';                                    // 空气列（自动吃掉剩余）
+    html += '</colgroup>';
 
+    // thead
     html += '<thead><tr>';
-    html += `<th class="chk-col"><input type="checkbox" id="previewCheckAll" checked></th>`;
-    html += `<th class="old-col">`;
-    html += `  <div class="th-inner">`;
-    html += `    <span class="th-label">原始标题</span>`;
-    html += `    <span class="th-splitter" data-pkey="old"></span>`;
-    html += `  </div>`;
-    html += `</th>`;
-    html += `<th class="new-col">`;
-    html += `  <div class="th-inner">`;
-    html += `    <span class="th-label">改后标题</span>`;
-    html += `    <span class="th-splitter" data-pkey="new"></span>`;
-    html += `  </div>`;
-    html += `</th>`;
-    html += '</tr></thead><tbody>';
+    // 勾选列
+    html += `<th class="preview-th-chk"><span class="preview-th-label"><input type="checkbox" id="previewCheckAll" ${allChecked ? 'checked' : ''}></span></th>`;
+    // 原始标题
+    html += `<th data-pkey="old"><span class="preview-th-label">原始标题${arrowOld}</span><div class="preview-th-resizer" data-pkey="old"></div></th>`;
+    // 改后标题
+    html += `<th data-pkey="new"><span class="preview-th-label">改后标题${arrowNew}</span><div class="preview-th-resizer" data-pkey="new"></div></th>`;
+    // 空气列
+    html += `<th class="preview-th-air"></th>`;
+    html += '</tr></thead>';
 
-    let folderIdx = 0, bmIdx = 0;
-    visible.forEach(t => {
+    // tbody
+    html += '<tbody>';
+    sortedVisible.forEach(t => {
       const type = t.node.type;
-      const idx = type === 'folder' ? folderIdx++ : bmIdx++;
-      const oldT = t.node.title;
-      const newT = applyAllRules(oldT, idx, type);
+      const originalIdx = targets.indexOf(t);
+      const oldT = t.node.title || '';
+      const newT = applyAllRules(oldT, originalIdx, type);
       const checked = window.__renameChecked.get(t.node.id) !== false;
       const folderMark = type === 'folder' ? '📁 ' : '';
 
       html += `<tr class="${checked ? '' : 'disabled'}" data-id="${t.node.id}">`;
-      html += `<td class="chk-col"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></td>`;
-      html += `<td class="old-col" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</td>`;
-      html += `<td class="new-col" title="${escAttr(newT)}">${esc(folderMark + newT)}</td>`;
-      html += '</tr>';
+      html += `  <td class="preview-td-chk"><input type="checkbox" class="preview-chk" data-id="${t.node.id}" ${checked ? 'checked' : ''}></td>`;
+      html += `  <td class="preview-td-old" title="${escAttr(oldT)}">${esc(folderMark + oldT)}</td>`;
+      html += `  <td class="preview-td-new" title="${escAttr(newT)}">${esc(folderMark + newT)}</td>`;
+      html += `  <td class="preview-td-air"></td>`;
+      html += `</tr>`;
     });
-
     html += '</tbody></table>';
+    // 增加表尾空气区，确保下方有足够空间进行框选
+    html += '<div class="preview-air-footer"></div>';
+
     previewInnerEl.innerHTML = html;
 
+    // ---------- 勾选交互 ----------
     const chkAll = document.getElementById('previewCheckAll');
     if (chkAll) {
       chkAll.onchange = (e) => {
-        const on = e.target.checked;
         previewInnerEl.querySelectorAll('.preview-chk').forEach(cb => {
-          cb.checked = on;
-          window.__renameChecked.set(cb.dataset.id, on);
-          const tr = cb.closest('tr');
-          if (on) tr.classList.remove('disabled');
-          else tr.classList.add('disabled');
+          cb.checked = e.target.checked;
+          window.__renameChecked.set(cb.dataset.id, e.target.checked);
+          cb.closest('tr').classList.toggle('disabled', !e.target.checked);
         });
       };
     }
-
     previewInnerEl.querySelectorAll('.preview-chk').forEach(cb => {
-      cb.onchange = (e) => {
-        window.__renameChecked.set(cb.dataset.id, e.target.checked);
-        const tr = cb.closest('tr');
-        if (e.target.checked) tr.classList.remove('disabled');
-        else tr.classList.add('disabled');
+      cb.onchange = () => {
+        window.__renameChecked.set(cb.dataset.id, cb.checked);
+        cb.closest('tr').classList.toggle('disabled', !cb.checked);
       };
     });
 
-    previewInnerEl.querySelectorAll('th .th-splitter').forEach(sp => {
+    // ---------- 表头点击排序 ----------
+    previewInnerEl.querySelectorAll('th[data-pkey]').forEach(th => {
+      const label = th.querySelector('.preview-th-label');
+      label.onclick = (e) => {
+        e.stopPropagation();
+        const key = th.dataset.pkey;
+        if (window.__previewSort.key === key) {
+          window.__previewSort.dir = -window.__previewSort.dir;
+        } else {
+          window.__previewSort.key = key;
+          window.__previewSort.dir = 1;
+        }
+        refreshPreview();
+      };
+    });
+
+    // ---------- Splitter 拖拽（直接改 colgroup，边拖边刷） ----------
+    previewInnerEl.querySelectorAll('.preview-th-resizer').forEach(sp => {
       sp.onmousedown = (e) => {
+        if (e.button !== 0) return;
         e.preventDefault();
         e.stopPropagation();
         const key = sp.dataset.pkey;
-        const other = key === 'old' ? 'new' : 'old';
-        const tableEl = previewInnerEl.querySelector('.preview-table');
-        const tableWidth = tableEl ? tableEl.getBoundingClientRect().width : 800;
-        const chkW = 34;
-        const usable = Math.max(100, tableWidth - chkW);
+        const colIndex = key === 'old' ? 1 : 2; // colgroup 里的索引
+        const colEl = previewInnerEl.querySelector(`colgroup col:nth-child(${colIndex + 1})`);
         const startX = e.clientX;
-        const startW = window.__previewColWidths[key];
+        const startW = window.__previewColWidths[key] || 400;
+
         sp.classList.add('dragging');
+        document.body.classList.add('col-resizing');
 
         const onMove = (ev) => {
-          const dx = ev.clientX - startX;
-          const dPct = (dx / usable) * 100;
-          let w1 = startW + dPct;
-          if (w1 < 10) w1 = 10;
-          if (w1 > 90) w1 = 90;
-          const w2 = 100 - w1;
-          window.__previewColWidths[key] = w1;
-          window.__previewColWidths[other] = w2;
-          const col1 = previewInnerEl.querySelector(`col[data-pkey="${key}"]`);
-          const col2 = previewInnerEl.querySelector(`col[data-pkey="${other}"]`);
-          if (col1) col1.style.width = w1 + '%';
-          if (col2) col2.style.width = w2 + '%';
+          let w = startW + (ev.clientX - startX);
+          if (w < 50) w = 50;
+          if (w > 1200) w = 1200;
+          window.__previewColWidths[key] = w;
+          // 直接改 col 宽度：table-layout: fixed 下立即生效，不会影响另一列
+          if (colEl) colEl.style.width = w + 'px';
         };
         const onUp = () => {
-          sp.classList.remove('dragging');
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
+          sp.classList.remove('dragging');
+          document.body.classList.remove('col-resizing');
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
       };
+
+      // 双击自适应：按该列最长内容算宽度
+      sp.ondblclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = sp.dataset.pkey;
+        const tdClass = key === 'old' ? '.preview-td-old' : '.preview-td-new';
+        const samples = previewInnerEl.querySelectorAll(tdClass);
+        let maxW = 60;
+        const meas = document.createElement('span');
+        meas.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:12px "Segoe UI","Microsoft YaHei",sans-serif;';
+        document.body.appendChild(meas);
+        samples.forEach(el => {
+          meas.textContent = el.textContent;
+          const w = meas.getBoundingClientRect().width + 20;
+          if (w > maxW) maxW = w;
+        });
+        document.body.removeChild(meas);
+        window.__previewColWidths[key] = Math.min(maxW, 800);
+        refreshPreview();
+      };
     });
+
+    // ---------- 终极无敌版框选：视觉记忆锁定法 ----------
+    if (!previewInnerEl.dataset.marqueeInit) {
+      previewInnerEl.dataset.marqueeInit = 'true';
+      let startX = 0, startY = 0;
+      let baseChecked = new Map();
+      let draggedIds = new Set(); // 记录本次拖拽中，所有曾经碰到过的行 ID
+
+      previewInnerEl.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest('thead') || e.target.classList.contains('preview-chk') || e.target.classList.contains('preview-th-resizer')) return;
+
+        e.preventDefault();
+        isPreviewMarquee = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        draggedIds.clear(); // 每次拖拽开始，清空历史记录
+
+        // 1. 备份拖拽前的状态
+        baseChecked.clear();
+        previewInnerEl.querySelectorAll('tbody tr').forEach(tr => {
+          const cb = tr.querySelector('.preview-chk');
+          if (cb) baseChecked.set(cb.dataset.id, cb.checked);
+        });
+
+        const box = document.createElement('div');
+        box.className = 'marquee';
+        box.style.display = 'block';
+        if (!box.parentNode) document.body.appendChild(box);
+
+        const updateMarquee = (clientX, clientY) => {
+          if (!isPreviewMarquee) return;
+
+          // 画框
+          const x1 = Math.min(startX, clientX), y1 = Math.min(startY, clientY);
+          const x2 = Math.max(startX, clientX), y2 = Math.max(startY, clientY);
+          box.style.left = x1 + 'px'; box.style.top = y1 + 'px';
+          box.style.width = (x2 - x1) + 'px'; box.style.height = (y2 - y1) + 'px';
+
+          // 判定当前视口内的行
+          previewInnerEl.querySelectorAll('tbody tr').forEach(tr => {
+            const rr = tr.getBoundingClientRect();
+            // 只要这一行的顶部、底部、或者整个行只要有一丝丝在屏幕框内，就算命中
+            const hit = !(rr.right < x1 || rr.left > x2 || rr.bottom < y1 || rr.top > y2);
+
+            const cb = tr.querySelector('.preview-chk');
+            if (cb && hit) {
+              // 核心：只要撞到了，就把它加入记忆集合！
+              draggedIds.add(cb.dataset.id);
+            }
+          });
+
+          // 统一更新状态
+          previewInnerEl.querySelectorAll('tbody tr').forEach(tr => {
+            const cb = tr.querySelector('.preview-chk');
+            if (cb) {
+              // 最终判定：如果在记忆集合里，说明它在这个拖拽过程中被碰过。
+              // 如果碰过：反转它的初始状态（全选的变取消，没选的变选中）。
+              // 如果没碰过：保持初始状态。
+              const isChecked = draggedIds.has(cb.dataset.id) ? !baseChecked.get(cb.dataset.id) : baseChecked.get(cb.dataset.id);
+
+              if (cb.checked !== isChecked) {
+                cb.checked = isChecked;
+                window.__renameChecked.set(cb.dataset.id, isChecked);
+                tr.classList.toggle('disabled', !isChecked);
+              }
+            }
+          });
+        };
+
+        const onMove = (ev) => {
+          window.__lastMarqueeEv = ev;
+          updateMarquee(ev.clientX, ev.clientY);
+        };
+
+        const onScroll = () => {
+          if (!isPreviewMarquee || !window.__lastMarqueeEv) return;
+          updateMarquee(window.__lastMarqueeEv.clientX, window.__lastMarqueeEv.clientY);
+        };
+
+        const onUp = () => {
+          isPreviewMarquee = false;
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          previewInnerEl.parentElement.removeEventListener('scroll', onScroll);
+          if (box.parentNode) box.parentNode.removeChild(box);
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        previewInnerEl.parentElement.addEventListener('scroll', onScroll);
+      });
+    }
   }
 
   function getCheckedPreviewIds() {
@@ -2329,9 +2467,6 @@ function setupMarquee() {
 
   listEl.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    // 若正在内联编辑：
-    //   - 点在输入框内 → 放过（让用户定位光标）
-    //   - 点在输入框外 → 先提交再继续
     if (editingId) {
       if (e.target.closest('.inline-edit')) return;
       const input = document.querySelector('.inline-edit');
@@ -2477,6 +2612,9 @@ function showAbout() {
       单文件、零依赖的 Chrome 书签整理工具。
     </p>
     <p style="color:var(--muted); font-size:11px; margin-top:10px; border-top:1px solid var(--border); padding-top:8px; line-height:1.8;">
+      <b>v1.10.0</b> · 彻底重构批量改名预览表：改用 <table> + fixed 布局解决表头拖拽跳动；引入“视觉记忆锁定法”实现无死角滚轮框选（支持无限滚动加减选）；<br>
+      <b>v1.9.3</b> · 彻底修复批量改名预览表表头文字消失、拉杆跳跃问题（完全拆分表头文字与拉杆的结构）。<br>
+      <b>v1.9.2</b> · 修复批量改名预览表列宽、拖拽错位、双击不缩放的问题。<br>
       <b>v1.9.1</b> · 排序改符号>数字>英文>中文、批量改名应用不关窗；fix: 内联改名点空白即提交；refactor: 撤销/重做整树快照+跨弹窗清空<br>
       <b>v1.9.0</b> · 去掉全局排序开关（每文件夹独立记）；排序时文件夹永远在前；列表右侧留 60px 空气区支持框选<br>
       <b>v1.8.1</b> · 批量改名预览表铺满容器不溢出、表头改 Windows 风格、原始/改后列可拖<br>
